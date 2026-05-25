@@ -1,0 +1,7 @@
+<nav class="nav nav-pills flex-column flex-sm-row gap-2 mt-3" aria-label="Navegacao da turma">
+    <a class="nav-link {% if request.resolver_match.url_name == 'turma_detalhes' %}active{% endif %}" href="{% url 'turma_detalhes' turma.id %}">Visao Geral</a>
+    <a class="nav-link {% if 'disciplina' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_disciplina_lista' turma.id %}">Disciplinas</a>
+    <a class="nav-link {% if 'conteudo' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_conteudo_lista' turma.id %}">Conteudos</a>
+    <a class="nav-link {% if 'anotacao' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_anotacao_lista' turma.id %}">Anotacoes</a>
+    <a class="nav-link {% if 'alerta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_alerta_lista' turma.id %}">Alertas</a>
+</nav>

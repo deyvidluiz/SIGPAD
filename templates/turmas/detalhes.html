@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ turma.nome }} | SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-people" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Painel da turma{% endblock %}
+{% block page_title %}{{ turma.nome }}{% endblock %}
+{% block page_subtitle %}{{ turma.get_turno_display }} - {{ turma.ano_letivo }}{% endblock %}
+
+{% block heading_actions %}
+<a href="{% url 'turma_editar' turma.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square" aria-hidden="true"></i> Editar turma</a>
+<a href="{% url 'turma_disciplina_criar' turma.id %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nova disciplina</a>
+{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<section class="row g-3 mt-1" aria-label="Metricas da turma">
+    <div class="col-12 col-md-4">
+        <article class="metric-card metric-primary">
+            <div class="metric-top">
+                <span class="metric-label">Disciplinas</span>
+                <span class="metric-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_disciplinas|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="metric-card metric-success">
+            <div class="metric-top">
+                <span class="metric-label">Conteudos</span>
+                <span class="metric-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_conteudos|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="metric-card metric-warning">
+            <div class="metric-top">
+                <span class="metric-label">Alertas</span>
+                <span class="metric-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_alertas|default:0 }}</div>
+        </article>
+    </div>
+</section>
+
+<section class="row g-3 mt-1">
+    <div class="col-12 col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-header">
+                <h2 class="h5 mb-0 section-title"><i class="bi bi-journal-bookmark" aria-hidden="true"></i><span>Disciplinas da turma</span></h2>
+                <a class="btn btn-light btn-sm" href="{% url 'turma_disciplina_lista' turma.id %}">Ver todas</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for disciplina in disciplinas %}
+                    <a class="list-group-item list-group-item-action" href="{% url 'disciplina_detalhes' disciplina.id %}">
+                        <strong>{{ disciplina.nome }}</strong>
+                        <span class="text-muted small d-block">{{ disciplina.carga_horaria }}h - {{ disciplina.ano_escolar }}</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">Nenhuma disciplina cadastrada.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-header">
+                <h2 class="h5 mb-0 section-title"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><span>Conteudos recentes</span></h2>
+                <a class="btn btn-light btn-sm" href="{% url 'turma_conteudo_lista' turma.id %}">Ver todos</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for conteudo in conteudos %}
+                    <a class="list-group-item list-group-item-action" href="{% url 'conteudo_detalhes' conteudo.id %}">
+                        <strong>{{ conteudo.titulo }}</strong>
+                        <span class="text-muted small d-block">{{ conteudo.disciplina.nome }} - {{ conteudo.get_periodo_planejamento_display }}</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">Nenhum conteudo cadastrado.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-header">
+                <h2 class="h5 mb-0 section-title"><i class="bi bi-bell" aria-hidden="true"></i><span>Alertas da turma</span></h2>
+                <a class="btn btn-light btn-sm" href="{% url 'turma_alerta_lista' turma.id %}">Abrir</a>
+            </div>
+            {% for alerta in alertas %}
+                <p class="mb-2"><strong>{{ alerta.titulo }}</strong><span class="text-muted small d-block">{{ alerta.created_at|date:'d/m/Y H:i' }}</span></p>
+            {% empty %}
+                <p class="text-muted mb-0">Nenhum alerta no momento.</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-header">
+                <h2 class="h5 mb-0 section-title"><i class="bi bi-stickies" aria-hidden="true"></i><span>Anotacoes</span></h2>
+                <a class="btn btn-light btn-sm" href="{% url 'turma_anotacao_lista' turma.id %}">Abrir</a>
+            </div>
+            {% for anotacao in anotacoes %}
+                <p class="mb-2"><strong>{{ anotacao.titulo }}</strong><span class="text-muted small d-block">{{ anotacao.created_at|date:'d/m/Y H:i' }}</span></p>
+            {% empty %}
+                <p class="text-muted mb-0">Nenhuma anotacao cadastrada.</p>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endblock %}

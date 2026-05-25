@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalhes da Disciplina | Planejamento PCC{% endblock %}
+{% block page_title %}Detalhes da disciplina{% endblock %}
+
+{% block turma_subnav %}
+{% if turma %}{% include 'turmas/_submenu.html' %}{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5">{{ disciplina.nome|default:'Disciplina' }}</h2>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Turma</dt>
+            <dd class="col-sm-9">{{ disciplina.turma.nome|default:'-' }}</dd>
+            <dt class="col-sm-3">Carga horaria</dt>
+            <dd class="col-sm-9">{{ disciplina.carga_horaria|default:'-' }}</dd>
+            <dt class="col-sm-3">Ano escolar</dt>
+            <dd class="col-sm-9">{{ disciplina.ano_escolar|default:'-' }}</dd>
+            <dt class="col-sm-3">Descricao</dt>
+            <dd class="col-sm-9">{{ disciplina.descricao|default:'-' }}</dd>
+        </dl>
+        <div class="d-flex gap-2 mt-4">
+            <a href="{% url 'disciplina_editar' disciplina.id %}" class="btn btn-primary">Editar</a>
+            <a href="{% url 'disciplina_deletar' disciplina.id %}" class="btn btn-outline-danger">Excluir</a>
+            {% if turma %}
+                <a href="{% url 'turma_disciplina_lista' turma.id %}" class="btn btn-outline-secondary">Voltar</a>
+            {% else %}
+                <a href="{% url 'disciplina_lista' %}" class="btn btn-outline-secondary">Voltar</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

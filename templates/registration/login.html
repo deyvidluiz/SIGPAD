@@ -1,0 +1,48 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login | SIGPAD</title>
+    <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+</head>
+<body>
+    <main class="min-vh-100 d-flex align-items-center justify-content-center p-3">
+        <section class="panel" style="width: min(100%, 420px);">
+            <div class="panel-header">
+                <div>
+                    <h1 class="h4 mb-1 section-title">
+                        <i class="bi bi-grid-1x2-fill" aria-hidden="true"></i>
+                        <span>SIGPAD</span>
+                    </h1>
+                    <p class="text-muted mb-0">Entre com seu usuario e senha.</p>
+                </div>
+            </div>
+
+            {% if form.errors %}
+                <div class="alert alert-danger">Usuario ou senha invalidos.</div>
+            {% endif %}
+
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ next }}">
+                <div class="mb-3">
+                    <label class="form-label" for="{{ form.username.id_for_label }}">Usuario</label>
+                    {{ form.username }}
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="{{ form.password.id_for_label }}">Senha</label>
+                    {{ form.password }}
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Entrar</button>
+            </form>
+        </section>
+    </main>
+
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'assets/js/main.js' %}"></script>
+</body>
+</html>

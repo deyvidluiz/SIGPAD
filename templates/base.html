@@ -1,0 +1,163 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Sistema de planejamento PCC">
+    <title>{% block title %}SIGPAD{% endblock %}</title>
+
+    <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+</head>
+
+<body>
+    <div class="admin-shell">
+        <div class="sidebar-backdrop" data-sidebar-close></div>
+
+        <aside class="admin-sidebar" id="adminSidebar" aria-label="Navegacao principal">
+            <div class="sidebar-header">
+                <a class="brand-mark" href="{% url 'dashboard' %}" aria-label="SIGPAD dashboard">
+                    <span class="brand-icon"><i class="bi bi-grid-1x2-fill" aria-hidden="true"></i></span>
+                    <span class="brand-copy">
+                        <span class="brand-title">SIGPAD</span>
+                        <span class="brand-subtitle">AdminHMD</span>
+                    </span>
+                </a>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}aria-current="page"{% endif %}>
+                    <span class="nav-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
+                    <span class="nav-text">Dashboard</span>
+                </a>
+                <a class="nav-link {% if 'turma' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_lista' %}">
+                    <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+                    <span class="nav-text">Turmas</span>
+                </a>
+                <a class="nav-link {% if 'alerta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'alerta_lista' %}">
+                    <span class="nav-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
+                    <span class="nav-text">Alertas</span>
+                </a>
+                <a class="nav-link {% if request.resolver_match.url_name == 'perfil_usuario' or request.resolver_match.url_name == 'editar_perfil' or request.resolver_match.url_name == 'alterar_senha' %}active{% endif %}" href="{% url 'perfil_usuario' %}">
+                    <span class="nav-icon"><i class="bi bi-person-circle" aria-hidden="true"></i></span>
+                    <span class="nav-text">Meu Perfil</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <span class="status-dot"></span>
+                <span class="sidebar-footer-text">Sistema em execucao</span>
+            </div>
+        </aside>
+
+        <div class="admin-main">
+            <nav class="navbar admin-navbar navbar-expand bg-white">
+                <div class="container-fluid px-3 px-lg-4">
+                    <button class="sidebar-toggle" type="button" data-sidebar-toggle aria-controls="adminSidebar" aria-expanded="true" aria-label="Alternar menu">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+
+                    <form class="d-none d-md-flex ms-3 flex-grow-1" role="search">
+                        <input class="form-control search-input" type="search" placeholder="Buscar turmas, conteudos e alertas" aria-label="Buscar">
+                    </form>
+
+                    <div class="navbar-actions ms-auto">
+                        <button class="icon-button theme-toggle" type="button" data-theme-toggle aria-label="Alternar tema" title="Alternar tema">
+                            <i class="bi bi-moon-stars" data-theme-icon aria-hidden="true"></i>
+                        </button>
+
+                        <div class="dropdown">
+                            <button class="icon-button" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Notificacoes">
+                                {% if alertas_nao_lidos_navbar %}
+                                    <span class="notification-dot"></span>
+                                {% endif %}
+                                <i class="bi bi-bell" aria-hidden="true"></i>
+                                {% if alertas_nao_lidos_navbar %}
+                                    <span class="visually-hidden">{{ alertas_nao_lidos_navbar }} alertas nao lidos</span>
+                                {% endif %}
+                            </button>
+                            <div class="dropdown-menu dropdown-menu-end notification-menu">
+                                <div class="dropdown-header fw-bold text-body">Notificacoes{% if alertas_nao_lidos_navbar %} ({{ alertas_nao_lidos_navbar }}){% endif %}</div>
+                                {% for alerta in alertas_navbar %}
+                                    <a class="dropdown-item" href="{% if alerta.turma %}{% url 'turma_alerta_lista' alerta.turma.id %}{% else %}{% url 'alerta_lista' %}{% endif %}">
+                                        <span class="badge {{ alerta.badge }} me-2"><i class="{{ alerta.icone }}" aria-hidden="true"></i></span>
+                                        <span class="notification-title">{{ alerta.titulo }}</span>
+                                        <span class="notification-time">{{ alerta.quantidade }} alerta{{ alerta.quantidade|pluralize }}</span>
+                                    </a>
+                                {% empty %}
+                                    <span class="dropdown-item text-muted">Nenhum alerta nao lido</span>
+                                {% endfor %}
+                                <div class="dropdown-divider"></div>
+                                <a class="dropdown-item" href="{% url 'alerta_lista' %}">
+                                    <span class="notification-title">Ver todos os alertas</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="dropdown">
+                            <button class="profile-button dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                {% if request.user.is_authenticated and request.user.perfilusuario.foto %}
+                                    <img class="avatar-img avatar-sm" src="{{ request.user.perfilusuario.foto.url }}" alt="Foto do usuario">
+                                {% else %}
+                                    <img class="avatar-img avatar-sm" src="{% static 'assets/images/avatar/avatar.jpg' %}" alt="Foto padrao">
+                                {% endif %}
+                                <span class="profile-name d-none d-sm-inline">{% if request.user.is_authenticated %}{{ request.user.get_full_name|default:request.user.username }}{% else %}Entrar{% endif %}</span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% if request.user.is_authenticated %}
+                                    <li><a class="dropdown-item" href="{% url 'perfil_usuario' %}">Meu Perfil</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item" href="{% url 'logout' %}">Sair</a></li>
+                                {% else %}
+                                    <li><a class="dropdown-item" href="{% url 'login' %}">Entrar</a></li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <main class="dashboard-content">
+                <div class="container-fluid px-3 px-lg-4 py-4">
+                    <div class="page-heading">
+                        <div class="page-heading-copy">
+                            <span class="page-icon">{% block page_icon %}<i class="bi bi-speedometer2" aria-hidden="true"></i>{% endblock %}</span>
+                            <div>
+                                <p class="eyebrow mb-1">{% block page_eyebrow %}Planejamento{% endblock %}</p>
+                                <h1 class="h3 mb-1">{% block page_title %}Dashboard{% endblock %}</h1>
+                                <p class="text-muted mb-0">{% block page_subtitle %}Acompanhe disciplinas, conteudos e progresso do PCC em um unico painel.{% endblock %}</p>
+                            </div>
+                        </div>
+                        <div class="heading-actions">{% block heading_actions %}{% endblock %}</div>
+                    </div>
+                    {% block turma_subnav %}{% endblock %}
+
+                    {% if messages %}
+                        <div class="mt-3">
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags|default:'info' }} mb-2">{{ message }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    {% block content %}{% endblock %}
+                </div>
+            </main>
+
+            <footer class="admin-footer">
+                <div class="container-fluid px-3 px-lg-4">
+                    <span>SIGPAD com template adminHMD.</span>
+                    <span>Ambiente de desenvolvimento.</span>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'assets/js/main.js' %}"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}Anotacoes | SIGPAD{% endblock %}
+{% block page_title %}Anotacoes - {{ turma.nome }}{% endblock %}
+{% block page_subtitle %}Registre observacoes pedagogicas desta turma.{% endblock %}
+
+{% block heading_actions %}
+<a href="{% url 'turma_anotacao_criar' turma.id %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nova anotacao</a>
+{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="list-group list-group-flush">
+        {% for anotacao in anotacoes %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between gap-3">
+                    <div>
+                        <strong>{{ anotacao.titulo }}</strong>
+                        <p class="text-muted mb-0">{{ anotacao.descricao }}</p>
+                        <small class="text-muted">{{ anotacao.created_at|date:'d/m/Y H:i' }}</small>
+                    </div>
+                    <div class="text-end">
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'turma_anotacao_editar' turma.id anotacao.id %}">Editar</a>
+                        <a class="btn btn-sm btn-outline-danger" href="{% url 'turma_anotacao_deletar' turma.id anotacao.id %}">Excluir</a>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="list-group-item text-center text-muted py-4">Nenhuma anotacao cadastrada.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

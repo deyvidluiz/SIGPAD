@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalhes do Conteudo | Planejamento PCC{% endblock %}
+{% block page_title %}Detalhes do conteudo{% endblock %}
+
+{% block turma_subnav %}
+{% if turma %}{% include 'turmas/_submenu.html' %}{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <h2 class="h5">{{ conteudo.titulo|default:'Conteudo' }}</h2>
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Turma</dt>
+            <dd class="col-sm-9">{{ conteudo.disciplina.turma.nome|default:'-' }}</dd>
+            <dt class="col-sm-3">Disciplina</dt>
+            <dd class="col-sm-9">{{ conteudo.disciplina|default:'-' }}</dd>
+            <dt class="col-sm-3">Titulo</dt>
+            <dd class="col-sm-9">{{ conteudo.titulo|default:'-' }}</dd>
+            <dt class="col-sm-3">Descricao</dt>
+            <dd class="col-sm-9">{{ conteudo.descricao|default:'-' }}</dd>
+            <dt class="col-sm-3">Tipo de periodo</dt>
+            <dd class="col-sm-9">{{ conteudo.get_tipo_periodo_display|default:'-' }}</dd>
+            <dt class="col-sm-3">Periodo</dt>
+            <dd class="col-sm-9">{{ conteudo.get_periodo_planejamento_display|default:'-' }}</dd>
+            <dt class="col-sm-3">Data de inicio</dt>
+            <dd class="col-sm-9">{{ conteudo.data_inicio|date:'d/m/Y'|default:'-' }}</dd>
+            <dt class="col-sm-3">Data de fim</dt>
+            <dd class="col-sm-9">{{ conteudo.data_fim|date:'d/m/Y'|default:'-' }}</dd>
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9"><span class="badge {{ conteudo.get_status_badge_class }}">{{ conteudo.get_status_display|default:'-' }}</span></dd>
+            <dt class="col-sm-3">Data de conclusao</dt>
+            <dd class="col-sm-9">
+                {% if conteudo.data_conclusao %}
+                    {{ conteudo.data_conclusao|date:'d/m/Y H:i' }}
+                {% else %}
+                    Ainda nao concluida
+                {% endif %}
+            </dd>
+            <dt class="col-sm-3">Arquivo</dt>
+            <dd class="col-sm-9">
+                {% if conteudo.arquivo %}
+                    <a class="btn btn-sm btn-outline-primary" href="{{ conteudo.arquivo.url }}">Baixar arquivo</a>
+                {% else %}
+                    -
+                {% endif %}
+            </dd>
+            {% if conteudo.unidade %}
+                <dt class="col-sm-3">Observacoes</dt>
+                <dd class="col-sm-9">{{ conteudo.unidade }}</dd>
+            {% endif %}
+        </dl>
+        <div class="d-flex gap-2 mt-4">
+            {% if not conteudo.concluido %}
+                <form method="post" action="{% url 'conteudo_concluir' conteudo.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{% url 'conteudo_detalhes' conteudo.id %}">
+                    <button type="submit" class="btn btn-success">Marcar como concluido</button>
+                </form>
+            {% endif %}
+            <a href="{% url 'conteudo_editar' conteudo.id %}" class="btn btn-primary">Editar</a>
+            <a href="{% url 'conteudo_deletar' conteudo.id %}" class="btn btn-outline-danger">Excluir</a>
+            {% if turma %}
+                <a href="{% url 'turma_conteudo_lista' turma.id %}" class="btn btn-outline-secondary">Voltar</a>
+            {% else %}
+                <a href="{% url 'conteudo_lista' %}" class="btn btn-outline-secondary">Voltar</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

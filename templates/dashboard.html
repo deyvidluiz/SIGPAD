@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-speedometer2" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Visao geral{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Acesse uma turma para gerenciar disciplinas, conteudos, anotacoes e alertas.{% endblock %}
+
+{% block heading_actions %}
+<a class="btn btn-primary btn-sm" href="{% url 'turma_criar' %}">
+    <i class="bi bi-plus-lg" aria-hidden="true"></i> Nova turma
+</a>
+{% endblock %}
+
+{% block content %}
+<section class="row g-3 mt-1" aria-label="Metricas do dashboard">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-primary">
+            <div class="metric-top">
+                <span class="metric-label">Turmas</span>
+                <span class="metric-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_turmas|default:0 }}</div>
+        </article>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-success">
+            <div class="metric-top">
+                <span class="metric-label">Disciplinas</span>
+                <span class="metric-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_disciplinas|default:0 }}</div>
+        </article>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-warning">
+            <div class="metric-top">
+                <span class="metric-label">Conteudos</span>
+                <span class="metric-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_conteudos|default:0 }}</div>
+        </article>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-danger">
+            <div class="metric-top">
+                <span class="metric-label">Alertas</span>
+                <span class="metric-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ alertas_nao_lidos|default:0 }}</div>
+        </article>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-bell" aria-hidden="true"></i>
+                <span>Alertas gerais</span>
+            </h2>
+            <p class="text-muted mb-0">Resumo rapido das turmas com pendencias ou prazos proximos.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'alerta_lista' %}">Ver alertas</a>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for alerta in alertas_gerais %}
+            <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{% if alerta.turma %}{% url 'turma_alerta_lista' alerta.turma.id %}{% else %}{% url 'alerta_lista' %}{% endif %}">
+                <span>
+                    <span class="badge {{ alerta.badge }} me-2"><i class="{{ alerta.icone }}" aria-hidden="true"></i></span>
+                    {{ alerta.titulo }}
+                </span>
+                <span class="badge text-bg-secondary">{{ alerta.quantidade }}</span>
+            </a>
+        {% empty %}
+            <div class="list-group-item text-muted">Nenhum alerta geral nao lido.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-people" aria-hidden="true"></i>
+                <span>Minhas turmas</span>
+            </h2>
+            <p class="text-muted mb-0">Entre em uma turma para abrir o painel pedagogico especifico.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'turma_lista' %}">Ver todas</a>
+    </div>
+
+    <div class="row g-3">
+        {% for turma in turmas %}
+            <div class="col-12 col-md-6 col-xl-3">
+                <a class="card border-0 shadow-sm text-decoration-none h-100" href="{% url 'turma_detalhes' turma.id %}">
+                    <div class="card-body">
+                        <h3 class="h6 text-body mb-1">{{ turma.nome }}</h3>
+                        <p class="text-muted small mb-2">{{ turma.get_turno_display }} - {{ turma.ano_letivo }}</p>
+                        <span class="badge text-bg-primary">{{ turma.disciplinas.count }} disciplinas</span>
+                    </div>
+                </a>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <p class="text-muted mb-0">Nenhuma turma cadastrada.</p>
+            </div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

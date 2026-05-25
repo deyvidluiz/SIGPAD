@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Meu Perfil | SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-person-circle" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Conta{% endblock %}
+{% block page_title %}Meu Perfil{% endblock %}
+{% block page_subtitle %}Visualize seus dados de acesso e informacoes pessoais no SIGPAD.{% endblock %}
+
+{% block heading_actions %}
+<a class="btn btn-outline-secondary btn-sm" href="{% url 'alterar_senha' %}">
+    <i class="bi bi-shield-lock" aria-hidden="true"></i> Alterar senha
+</a>
+<a class="btn btn-primary btn-sm" href="{% url 'editar_perfil' %}">
+    <i class="bi bi-pencil-square" aria-hidden="true"></i> Editar perfil
+</a>
+{% endblock %}
+
+{% block content %}
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div class="d-flex flex-column flex-sm-row align-items-center gap-3 text-center text-sm-start w-100">
+            {% if request.user.is_authenticated and request.user.perfilusuario.foto %}
+                <img class="avatar-img" style="width: 112px; height: 112px;" src="{{ request.user.perfilusuario.foto.url }}" alt="Foto do usuario">
+            {% else %}
+                <img class="avatar-img" style="width: 112px; height: 112px;" src="{% static 'assets/images/avatar/avatar.jpg' %}" alt="Foto padrao">
+            {% endif %}
+            <div>
+                <h2 class="h5 mb-1 section-title">
+                    <i class="bi bi-person-badge" aria-hidden="true"></i>
+                    <span>{{ request.user.get_full_name|default:request.user.username }}</span>
+                </h2>
+                <p class="text-muted mb-0">{{ request.user.email|default:'Email nao informado' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <dl class="row mb-0">
+        <dt class="col-sm-3">Usuario</dt>
+        <dd class="col-sm-9">{{ request.user.username }}</dd>
+
+        <dt class="col-sm-3">Nome completo</dt>
+        <dd class="col-sm-9">{{ request.user.get_full_name|default:'-' }}</dd>
+
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-9">{{ request.user.email|default:'-' }}</dd>
+
+        <dt class="col-sm-3">Ultimo login</dt>
+        <dd class="col-sm-9">{{ request.user.last_login|date:'d/m/Y H:i'|default:'Nunca acessou' }}</dd>
+
+        <dt class="col-sm-3">Data de cadastro</dt>
+        <dd class="col-sm-9">{{ request.user.date_joined|date:'d/m/Y H:i' }}</dd>
+    </dl>
+</section>
+{% endblock %}

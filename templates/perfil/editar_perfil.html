@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Perfil | SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-pencil-square" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Conta{% endblock %}
+{% block page_title %}Editar Perfil{% endblock %}
+{% block page_subtitle %}Atualize seu nome, email e foto de perfil.{% endblock %}
+
+{% block content %}
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title">
+                <i class="bi bi-ui-checks-grid" aria-hidden="true"></i>
+                <span>Dados do perfil</span>
+            </h2>
+            <p class="text-muted mb-0">A foto enviada sera exibida no menu e no topo do sistema.</p>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ usuario_form.as_p }}
+        {{ perfil_form.as_p }}
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Salvar alteracoes</button>
+            <a href="{% url 'perfil_usuario' %}" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

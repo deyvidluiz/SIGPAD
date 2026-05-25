@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Alertas | Planejamento PCC{% endblock %}
+{% block page_title %}{% if turma %}Alertas - {{ turma.nome }}{% else %}Alertas{% endif %}{% endblock %}
+
+{% block turma_subnav %}
+{% if turma %}{% include 'turmas/_submenu.html' %}{% endif %}
+{% endblock %}
+
+{% block content %}
+{% if not turma %}
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white fw-semibold">Alertas gerais</div>
+        <div class="list-group list-group-flush">
+            {% for alerta in alertas_gerais %}
+                <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{% if alerta.turma %}{% url 'turma_alerta_lista' alerta.turma.id %}{% else %}{% url 'alerta_lista' %}{% endif %}">
+                    <span>
+                        <span class="badge {{ alerta.badge }} me-2"><i class="{{ alerta.icone }}" aria-hidden="true"></i></span>
+                        {{ alerta.titulo }}
+                    </span>
+                    <span class="badge text-bg-secondary">{{ alerta.quantidade }}</span>
+                </a>
+            {% empty %}
+                <div class="list-group-item text-muted">Nenhum alerta geral nao lido.</div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white fw-semibold">{% if turma %}Alertas da Turma{% else %}Todos os alertas{% endif %}</div>
+    <div class="list-group list-group-flush">
+        {% for alerta in alertas %}
+            <div class="list-group-item {% if alerta.lido %}bg-light text-muted{% endif %}">
+                <div class="d-flex justify-content-between">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge {{ alerta.get_badge_class }}"><i class="{{ alerta.get_icon_class }}" aria-hidden="true"></i></span>
+                        <strong>{{ alerta.titulo }}</strong>
+                        <span class="badge {{ alerta.get_badge_class }}">{{ alerta.get_tipo_display }}</span>
+                        {% if not alerta.lido %}
+                            <span class="badge text-bg-warning">Nao lido</span>
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">{{ alerta.created_at|date:'d/m/Y H:i' }}</small>
+                </div>
+                <p class="mb-0 text-muted">{{ alerta.mensagem }}</p>
+                {% if alerta.turma and not turma %}
+                    <span class="small text-muted">{{ alerta.turma.nome }}</span>
+                {% endif %}
+                {% if alerta.conteudo %}
+                    <a class="small" href="{% url 'conteudo_detalhes' alerta.conteudo.id %}">Ver conteudo</a>
+                {% endif %}
+                {% if not alerta.lido %}
+                    <form class="d-inline ms-2" method="post" action="{% url 'alerta_lido' alerta.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{% if turma %}{% url 'turma_alerta_lista' turma.id %}{% else %}{% url 'alerta_lista' %}{% endif %}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Marcar como lido</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div class="list-group-item text-center text-muted py-4">Nenhum alerta no momento.</div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
