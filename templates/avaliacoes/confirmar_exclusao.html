@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Excluir Avaliacao | SIGPAD{% endblock %}
+{% block page_title %}Excluir avaliacao{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <p>Confirma a exclusao da avaliacao <strong>{{ avaliacao.titulo }}</strong>?</p>
+        <form method="post" class="d-flex gap-2">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Excluir</button>
+            <a href="{% url 'avaliacao_detalhes' turma.id avaliacao.id %}" class="btn btn-outline-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

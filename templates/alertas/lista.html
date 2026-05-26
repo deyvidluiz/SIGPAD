@@ -50,13 +50,20 @@
                 {% if alerta.conteudo %}
                     <a class="small" href="{% url 'conteudo_detalhes' alerta.conteudo.id %}">Ver conteudo</a>
                 {% endif %}
-                {% if not alerta.lido %}
-                    <form class="d-inline ms-2" method="post" action="{% url 'alerta_lido' alerta.id %}">
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    {% if not alerta.lido %}
+                        <form method="post" action="{% url 'alerta_lido' alerta.id %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{% if turma %}{% url 'turma_alerta_lista' turma.id %}{% else %}{% url 'alerta_lista' %}{% endif %}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Marcar como lido</button>
+                        </form>
+                    {% endif %}
+                    <form method="post" action="{% url 'alerta_excluir' alerta.id %}">
                         {% csrf_token %}
                         <input type="hidden" name="next" value="{% if turma %}{% url 'turma_alerta_lista' turma.id %}{% else %}{% url 'alerta_lista' %}{% endif %}">
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">Marcar como lido</button>
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Excluir alerta</button>
                     </form>
-                {% endif %}
+                </div>
             </div>
         {% empty %}
             <div class="list-group-item text-center text-muted py-4">Nenhum alerta no momento.</div>

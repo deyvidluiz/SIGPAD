@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}Avaliacao | SIGPAD{% endblock %}
+{% block page_title %}{{ acao|default:'Avaliacao' }} - {{ turma.nome }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+                <div class="mb-3">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+            {% for error in form.non_field_errors %}
+                <div class="alert alert-danger">{{ error }}</div>
+            {% endfor %}
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Salvar</button>
+                <a href="{% url 'avaliacao_lista' turma.id %}" class="btn btn-outline-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ acao }} | SIGPAD{% endblock %}
+{% block page_title %}{{ acao }} - {{ turma.nome }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    <section class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+            {% for field in form %}
+                <div class="mb-3">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold">Presenca dos alunos</div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th class="text-center">Presente</th>
+                        <th>Observacao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas %}
+                        <tr>
+                            <td>{{ linha.aluno.nome }}</td>
+                            <td class="text-center">
+                                <input class="form-check-input" type="checkbox" name="presente_{{ linha.aluno.id }}" {% if linha.presenca is None or linha.presenca.presente %}checked{% endif %}>
+                            </td>
+                            <td>
+                                <input class="form-control" type="text" name="observacao_{{ linha.aluno.id }}" value="{% if linha.presenca %}{{ linha.presenca.observacao|default:'' }}{% endif %}">
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">Nenhum aluno ativo cadastrado.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="sticky-save-bar d-flex justify-content-end gap-2 mt-3">
+        <a href="{% url 'chamada_turma' turma.id %}" class="btn btn-outline-secondary">Cancelar</a>
+        <button type="submit" class="btn btn-primary">Salvar chamada</button>
+    </div>
+</form>
+{% endblock %}

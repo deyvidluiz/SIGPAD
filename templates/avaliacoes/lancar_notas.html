@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block title %}Lancar Notas | SIGPAD{% endblock %}
+{% block page_title %}Lancar notas - {{ avaliacao.titulo }}{% endblock %}
+{% block page_subtitle %}{{ turma.nome }} - {{ avaliacao.disciplina.nome }} - Valor maximo: {{ avaliacao.valor_maximo }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<form method="post">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Aluno</th>
+                        <th style="width: 160px;">Nota</th>
+                        <th>Observacao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linha in linhas %}
+                        <tr>
+                            <td>{{ linha.aluno.nome }}</td>
+                            <td>
+                                <input class="form-control" type="number" step="0.01" min="0" max="{{ avaliacao.valor_maximo|unlocalize }}" name="nota_{{ linha.aluno.id }}" value="{% if linha.nota %}{{ linha.nota.nota|unlocalize }}{% endif %}">
+                            </td>
+                            <td>
+                                <input class="form-control" type="text" name="observacao_{{ linha.aluno.id }}" value="{% if linha.nota %}{{ linha.nota.observacao|default:'' }}{% endif %}">
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-4">Nenhum aluno ativo cadastrado.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">Salvar notas</button>
+        <a href="{% url 'avaliacao_detalhes' turma.id avaliacao.id %}" class="btn btn-outline-secondary">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

@@ -1,0 +1,80 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cadastro | SIGPAD</title>
+    <link rel="stylesheet" href="{% static 'assets/css/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/vendors/bootstrap-icons/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'assets/css/style.css' %}">
+</head>
+<body>
+    <main class="min-vh-100 d-flex align-items-center justify-content-center p-3">
+        <section class="panel" style="width: min(100%, 560px);">
+            <div class="panel-header">
+                <div>
+                    <h1 class="h4 mb-1 section-title">
+                        <i class="bi bi-person-plus" aria-hidden="true"></i>
+                        <span>Cadastro de professor</span>
+                    </h1>
+                    <p class="text-muted mb-0">Crie sua conta para acessar o SIGPAD.</p>
+                </div>
+            </div>
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.nome.id_for_label }}">Nome</label>
+                        {{ form.nome }}
+                        {% for error in form.nome.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.sobrenome.id_for_label }}">Sobrenome</label>
+                        {{ form.sobrenome }}
+                        {% for error in form.sobrenome.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.email.id_for_label }}">Email</label>
+                        {{ form.email }}
+                        {% for error in form.email.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.username.id_for_label }}">Usuario</label>
+                        {{ form.username }}
+                        {% for error in form.username.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.senha.id_for_label }}">Senha</label>
+                        {{ form.senha }}
+                        {% for error in form.senha.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.confirmar_senha.id_for_label }}">Confirmar senha</label>
+                        {{ form.confirmar_senha }}
+                        {% for error in form.confirmar_senha.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="{{ form.foto.id_for_label }}">Foto de perfil</label>
+                        {{ form.foto }}
+                        {% for error in form.foto.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary">Cadastrar</button>
+                    <a href="{% url 'login' %}" class="btn btn-outline-secondary">Ja tenho conta</a>
+                </div>
+            </form>
+        </section>
+    </main>
+
+    <script src="{% static 'assets/js/bootstrap.bundle.min.js' %}"></script>
+    <script src="{% static 'assets/js/main.js' %}"></script>
+</body>
+</html>

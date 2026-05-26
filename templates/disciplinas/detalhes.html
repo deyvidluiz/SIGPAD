@@ -16,6 +16,14 @@
             <dd class="col-sm-9">{{ disciplina.turma.nome|default:'-' }}</dd>
             <dt class="col-sm-3">Carga horaria</dt>
             <dd class="col-sm-9">{{ disciplina.carga_horaria|default:'-' }}</dd>
+            <dt class="col-sm-3">Tipo de periodo</dt>
+            <dd class="col-sm-9">{{ disciplina.get_tipo_periodo_display|default:'-' }}</dd>
+            <dt class="col-sm-3">Quantidade de aulas</dt>
+            <dd class="col-sm-9">{{ disciplina.quantidade_aulas|default:'-' }}</dd>
+            <dt class="col-sm-3">Nota total por periodo</dt>
+            <dd class="col-sm-9">{{ disciplina.nota_total|default:'-' }}</dd>
+            <dt class="col-sm-3">Media de aprovacao</dt>
+            <dd class="col-sm-9">{{ disciplina.media_aprovacao|default:'-' }}</dd>
             <dt class="col-sm-3">Ano escolar</dt>
             <dd class="col-sm-9">{{ disciplina.ano_escolar|default:'-' }}</dd>
             <dt class="col-sm-3">Descricao</dt>

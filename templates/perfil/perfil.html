@@ -20,10 +20,10 @@
 <section class="panel mt-3">
     <div class="panel-header">
         <div class="d-flex flex-column flex-sm-row align-items-center gap-3 text-center text-sm-start w-100">
-            {% if request.user.is_authenticated and request.user.perfilusuario.foto %}
-                <img class="avatar-img" style="width: 112px; height: 112px;" src="{{ request.user.perfilusuario.foto.url }}" alt="Foto do usuario">
+            {% if request.user.is_authenticated and perfil_usuario_logado.foto %}
+                <img class="avatar-img rounded-circle" style="width: 112px; height: 112px;" src="{{ perfil_usuario_logado.foto.url }}" alt="Foto do usuario">
             {% else %}
-                <img class="avatar-img" style="width: 112px; height: 112px;" src="{% static 'assets/images/avatar/avatar.jpg' %}" alt="Foto padrao">
+                <img class="avatar-img rounded-circle" style="width: 112px; height: 112px;" src="{% static 'assets/images/avatar/avatar.jpg' %}" alt="Foto padrao">
             {% endif %}
             <div>
                 <h2 class="h5 mb-1 section-title">

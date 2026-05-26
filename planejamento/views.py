@@ -1,20 +1,228 @@
+from decimal import Decimal, InvalidOperation
+
 from django.contrib import messages
-from django.contrib.auth import logout, update_session_auth_hash
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from .forms import (
     AlterarSenhaForm,
+    AlunoForm,
     AnotacaoTurmaForm,
+    AulaForm,
+    CadastroProfessorForm,
+    ChamadaForm,
     ConteudoProgramaticoForm,
     DisciplinaForm,
     PerfilUsuarioForm,
+    ProcessoAvaliativoForm,
     TurmaForm,
     UsuarioPerfilForm,
 )
-from .models import Alerta, AnotacaoTurma, ConteudoProgramatico, Disciplina, PerfilUsuario, Turma
+from .models import (
+    Alerta,
+    Aluno,
+    AnotacaoTurma,
+    Aula,
+    Chamada,
+    ConteudoProgramatico,
+    Disciplina,
+    NotaAluno,
+    PerfilUsuario,
+    Presenca,
+    PresencaAluno,
+    ProcessoAvaliativo,
+    RegistroAlunoTurma,
+    Turma,
+)
 from .utils import alertas_gerais_usuario, verificar_alertas_conteudos
+
+
+PERIODO_ORDEM = {
+    '1_BIMESTRE': 1,
+    '2_BIMESTRE': 2,
+    '3_BIMESTRE': 3,
+    '4_BIMESTRE': 4,
+    '1_TRIMESTRE': 1,
+    '2_TRIMESTRE': 2,
+    '3_TRIMESTRE': 3,
+    '1_SEMESTRE': 1,
+    '2_SEMESTRE': 2,
+    'ANUAL': 1,
+}
+
+TIPO_PERIODO_ORDEM = {
+    'BIMESTRE': 1,
+    'TRIMESTRE': 2,
+    'SEMESTRE': 3,
+    'ANUAL': 4,
+}
+
+PERIODO_BADGES = {
+    'BIMESTRE': 'text-bg-primary',
+    'TRIMESTRE': 'text-bg-success',
+    'SEMESTRE': 'text-bg-warning',
+    'ANUAL': 'text-bg-info',
+}
+
+PERIODO_TITULOS = dict(ConteudoProgramatico.PERIODO_CHOICES)
+TIPO_PERIODO_TITULOS = dict(ConteudoProgramatico.TIPO_PERIODO_CHOICES)
+
+
+def cadastro_professor(request):
+    form = CadastroProfessorForm(request.POST or None, request.FILES or None)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Cadastro realizado com sucesso. Entre com seu usuario e senha.')
+        return redirect('login')
+    return render(request, 'registration/cadastro.html', {'form': form})
+
+
+def _tipo_periodo_conteudo(conteudo):
+    if conteudo.tipo_periodo:
+        return conteudo.tipo_periodo
+    if conteudo.bimestre:
+        return 'BIMESTRE'
+    return 'ANUAL'
+
+
+def _periodo_conteudo(conteudo):
+    if conteudo.periodo:
+        return conteudo.periodo
+    if conteudo.bimestre:
+        return f'{conteudo.bimestre}_BIMESTRE'
+    return 'ANUAL'
+
+
+def _titulo_periodo_conteudo(conteudo):
+    titulo = conteudo.get_periodo_planejamento_display()
+    return titulo.upper() if titulo != '-' else 'ANUAL'
+
+
+def agrupar_conteudos_por_periodo(conteudos):
+    grupos = {}
+    for conteudo in conteudos:
+        tipo_periodo = _tipo_periodo_conteudo(conteudo)
+        periodo = _periodo_conteudo(conteudo)
+        chave = (tipo_periodo, periodo)
+        if chave not in grupos:
+            grupos[chave] = {
+                'tipo_periodo': tipo_periodo,
+                'periodo': periodo,
+                'titulo': _titulo_periodo_conteudo(conteudo),
+                'badge': PERIODO_BADGES.get(tipo_periodo, 'text-bg-secondary'),
+                'conteudos': [],
+            }
+        grupos[chave]['conteudos'].append(conteudo)
+
+    grupos_ordenados = sorted(
+        grupos.values(),
+        key=lambda grupo: (
+            TIPO_PERIODO_ORDEM.get(grupo['tipo_periodo'], 99),
+            PERIODO_ORDEM.get(grupo['periodo'], 99),
+            grupo['titulo'],
+        ),
+    )
+    for grupo in grupos_ordenados:
+        grupo['quantidade'] = len(grupo['conteudos'])
+    return grupos_ordenados
+
+
+def _media_notas(notas):
+    notas_validas = [nota for nota in notas if nota is not None]
+    if not notas_validas:
+        return None
+    media = sum(notas_validas, Decimal('0')) / len(notas_validas)
+    return media.quantize(Decimal('0.01'))
+
+
+def _linhas_presenca(turma, chamada=None):
+    alunos = turma.alunos.filter(ativo=True)
+    presencas_existentes = {}
+    if chamada is not None:
+        presencas_existentes = {presenca.aluno_id: presenca for presenca in chamada.presencas.select_related('aluno')}
+    return [
+        {
+            'aluno': aluno,
+            'presenca': presencas_existentes.get(aluno.id),
+        }
+        for aluno in alunos
+    ]
+
+
+def _salvar_presencas_chamada(request, turma, chamada):
+    houve_erro = False
+    for aluno in turma.alunos.filter(ativo=True):
+        presenca = PresencaAluno.objects.filter(chamada=chamada, aluno=aluno).first() or PresencaAluno(
+            chamada=chamada,
+            aluno=aluno,
+        )
+        presenca.presente = request.POST.get(f'presente_{aluno.id}') == 'on'
+        presenca.observacao = (request.POST.get(f'observacao_{aluno.id}') or '').strip()
+        try:
+            presenca.full_clean()
+        except ValidationError as erro:
+            mensagens = []
+            for erros_campo in erro.message_dict.values():
+                mensagens.extend(erros_campo)
+            messages.error(request, f'{aluno.nome}: {" ".join(mensagens)}')
+            houve_erro = True
+        else:
+            presenca.save()
+    return not houve_erro
+
+
+def _tipo_periodo_registro(registro):
+    return getattr(registro, 'tipo_periodo', None) or 'ANUAL'
+
+
+def _periodo_registro(registro):
+    return getattr(registro, 'periodo', None) or 'ANUAL'
+
+
+def _titulo_periodo(tipo_periodo, periodo):
+    return (PERIODO_TITULOS.get(periodo) or TIPO_PERIODO_TITULOS.get(tipo_periodo) or 'Anual').upper()
+
+
+def _percentual_presenca(total_presencas, total_aulas):
+    if not total_aulas:
+        return None
+    percentual = (Decimal(total_presencas) / Decimal(total_aulas)) * Decimal('100')
+    return percentual.quantize(Decimal('0.01'))
+
+
+def _resumo_presencas_aulas(turma, disciplina, alunos):
+    aulas = list(turma.aulas.filter(disciplina=disciplina).order_by('data', 'id')) if disciplina else []
+    total_aulas = sum(aula.quantidade_aulas for aula in aulas)
+    presencas = Presenca.objects.filter(aula__in=aulas, aluno__in=alunos)
+    aulas_por_id = {aula.id: aula for aula in aulas}
+    resumo = {aluno.id: {'total_aulas': total_aulas, 'presencas': 0, 'faltas': 0, 'percentual': None} for aluno in alunos}
+    for presenca in presencas:
+        quantidade = aulas_por_id[presenca.aula_id].quantidade_aulas
+        if presenca.presente:
+            resumo[presenca.aluno_id]['presencas'] += quantidade
+        else:
+            resumo[presenca.aluno_id]['faltas'] += quantidade
+    for aluno in alunos:
+        dados = resumo[aluno.id]
+        registros = dados['presencas'] + dados['faltas']
+        if registros < dados['total_aulas']:
+            dados['presencas'] += dados['total_aulas'] - registros
+        dados['percentual'] = _percentual_presenca(dados['presencas'], dados['total_aulas'])
+    return aulas, resumo
+
+
+def _filtrar_por_periodo(registros, tipo_periodo, periodo):
+    filtrados = []
+    for registro in registros:
+        if tipo_periodo and _tipo_periodo_registro(registro) != tipo_periodo:
+            continue
+        if periodo and _periodo_registro(registro) != periodo:
+            continue
+        filtrados.append(registro)
+    return filtrados
 
 
 @login_required
@@ -55,15 +263,23 @@ def turma_detalhes(request, id):
     ).select_related('disciplina')
     alertas = turma.alertas.filter(usuario=request.user).select_related('conteudo')
     anotacoes = turma.anotacoes.filter(professor=request.user)
+    processos = turma.processos_avaliativos.select_related('disciplina')
+    chamadas = turma.chamadas.select_related('disciplina')
     context = {
         'turma': turma,
         'disciplinas': disciplinas[:6],
         'conteudos': conteudos[:6],
         'alertas': alertas[:6],
         'anotacoes': anotacoes[:6],
+        'processos': processos[:6],
+        'chamadas': chamadas[:6],
+        'primeira_avaliacao': processos.first(),
         'total_disciplinas': disciplinas.count(),
         'total_conteudos': conteudos.count(),
         'total_alertas': alertas.count(),
+        'total_alunos': turma.alunos.count(),
+        'total_avaliacoes': processos.count(),
+        'total_presencas': chamadas.count(),
     }
     return render(request, 'turmas/detalhes.html', context)
 
@@ -182,7 +398,8 @@ def conteudo_lista(request):
     conteudos = ConteudoProgramatico.objects.filter(
         disciplina__professor=request.user,
     ).select_related('disciplina', 'disciplina__turma')
-    return render(request, 'conteudos/lista.html', {'conteudos': conteudos})
+    grupos_periodo = agrupar_conteudos_por_periodo(conteudos)
+    return render(request, 'conteudos/lista.html', {'conteudos': conteudos, 'grupos_periodo': grupos_periodo})
 
 
 @login_required
@@ -215,7 +432,8 @@ def turma_conteudo_lista(request, turma_id):
         disciplina__turma=turma,
         disciplina__professor=request.user,
     ).select_related('disciplina', 'disciplina__turma')
-    return render(request, 'conteudos/lista.html', {'conteudos': conteudos, 'turma': turma})
+    grupos_periodo = agrupar_conteudos_por_periodo(conteudos)
+    return render(request, 'conteudos/lista.html', {'conteudos': conteudos, 'grupos_periodo': grupos_periodo, 'turma': turma})
 
 
 @login_required
@@ -292,6 +510,568 @@ def alerta_lido(request, id):
     alerta.save(update_fields=['lido'])
     messages.success(request, 'Alerta marcado como lido.')
     return redirect(request.POST.get('next') or 'alerta_lista')
+
+
+@login_required
+@require_POST
+def alerta_excluir(request, id):
+    alerta = get_object_or_404(Alerta.objects.filter(usuario=request.user), id=id)
+    alerta.delete()
+    messages.success(request, 'Alerta excluido com sucesso.')
+    return redirect(request.POST.get('next') or 'alerta_lista')
+
+
+@login_required
+def aluno_lista(request, turma_id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    alunos = turma.alunos.all()
+    return render(request, 'alunos/lista.html', {'turma': turma, 'alunos': alunos})
+
+
+@login_required
+def aluno_criar(request, turma_id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    form = AlunoForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        aluno = form.save(commit=False)
+        aluno.turma = turma
+        aluno.save()
+        messages.success(request, 'Aluno cadastrado com sucesso.')
+        return redirect('aluno_detalhes', turma_id=turma.id, id=aluno.id)
+
+    return render(request, 'alunos/form.html', {'form': form, 'turma': turma, 'acao': 'Novo aluno'})
+
+
+@login_required
+def aluno_detalhes(request, turma_id, id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    aluno = get_object_or_404(Aluno.objects.filter(turma=turma), id=id)
+    notas = aluno.notas.select_related('processo', 'processo__disciplina')
+    return render(request, 'alunos/detalhes.html', {'turma': turma, 'aluno': aluno, 'notas': notas})
+
+
+@login_required
+def aluno_editar(request, turma_id, id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    aluno = get_object_or_404(Aluno.objects.filter(turma=turma), id=id)
+    form = AlunoForm(request.POST or None, instance=aluno)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Aluno atualizado com sucesso.')
+        return redirect('aluno_detalhes', turma_id=turma.id, id=aluno.id)
+
+    return render(request, 'alunos/form.html', {'form': form, 'turma': turma, 'aluno': aluno, 'acao': 'Editar aluno'})
+
+
+@login_required
+def aluno_deletar(request, turma_id, id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    aluno = get_object_or_404(Aluno.objects.filter(turma=turma), id=id)
+    if request.method == 'POST':
+        aluno.delete()
+        messages.success(request, 'Aluno removido com sucesso.')
+        return redirect('aluno_lista', turma_id=turma.id)
+
+    return render(request, 'alunos/confirmar_exclusao.html', {'turma': turma, 'aluno': aluno})
+
+
+@login_required
+def avaliacao_lista(request, turma_id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    avaliacoes = turma.processos_avaliativos.select_related('disciplina')
+    return render(request, 'avaliacoes/lista.html', {'turma': turma, 'avaliacoes': avaliacoes})
+
+
+@login_required
+def avaliacao_criar(request, turma_id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    form = ProcessoAvaliativoForm(request.POST or None, turma=turma)
+    if request.method == 'POST' and form.is_valid():
+        avaliacao = form.save(commit=False)
+        avaliacao.turma = turma
+        avaliacao.save()
+        messages.success(request, 'Avaliacao cadastrada com sucesso.')
+        return redirect('avaliacao_detalhes', turma_id=turma.id, id=avaliacao.id)
+
+    return render(request, 'avaliacoes/form.html', {'form': form, 'turma': turma, 'acao': 'Nova avaliacao'})
+
+
+@login_required
+def avaliacao_detalhes(request, turma_id, id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    avaliacao = get_object_or_404(
+        ProcessoAvaliativo.objects.filter(turma=turma).select_related('disciplina'),
+        id=id,
+    )
+    notas = avaliacao.notas.select_related('aluno')
+    return render(request, 'avaliacoes/detalhes.html', {'turma': turma, 'avaliacao': avaliacao, 'notas': notas})
+
+
+@login_required
+def avaliacao_editar(request, turma_id, id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    avaliacao = get_object_or_404(ProcessoAvaliativo.objects.filter(turma=turma), id=id)
+    form = ProcessoAvaliativoForm(request.POST or None, instance=avaliacao, turma=turma)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Avaliacao atualizada com sucesso.')
+        return redirect('avaliacao_detalhes', turma_id=turma.id, id=avaliacao.id)
+
+    return render(
+        request,
+        'avaliacoes/form.html',
+        {'form': form, 'turma': turma, 'avaliacao': avaliacao, 'acao': 'Editar avaliacao'},
+    )
+
+
+@login_required
+def avaliacao_deletar(request, turma_id, id):
+    turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
+    avaliacao = get_object_or_404(ProcessoAvaliativo.objects.filter(turma=turma), id=id)
+    if request.method == 'POST':
+        avaliacao.delete()
+        messages.success(request, 'Avaliacao removida com sucesso.')
+        return redirect('avaliacao_lista', turma_id=turma.id)
+
+    return render(request, 'avaliacoes/confirmar_exclusao.html', {'turma': turma, 'avaliacao': avaliacao})
+
+
+@login_required
+def lancar_notas(request, turma_id, avaliacao_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    avaliacao = get_object_or_404(
+        ProcessoAvaliativo.objects.filter(turma=turma).select_related('disciplina'),
+        id=avaliacao_id,
+    )
+    destino = (
+        f'/turmas/{turma.id}/planilha/?disciplina={avaliacao.disciplina_id}'
+        f'&tipo_periodo={avaliacao.tipo_periodo or "ANUAL"}'
+        f'&periodo={avaliacao.periodo or "ANUAL"}'
+    )
+    return redirect(destino)
+
+
+@login_required
+def boletim_turma(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    avaliacoes = list(turma.processos_avaliativos.select_related('disciplina'))
+    alunos = turma.alunos.filter(ativo=True)
+    notas = {
+        (nota.aluno_id, nota.processo_id): nota.nota
+        for nota in NotaAluno.objects.filter(aluno__turma=turma, processo__turma=turma)
+    }
+    linhas = []
+    for aluno in alunos:
+        notas_aluno = [notas.get((aluno.id, avaliacao.id)) for avaliacao in avaliacoes]
+        linhas.append({
+            'aluno': aluno,
+            'notas': notas_aluno,
+            'media': _media_notas(notas_aluno),
+        })
+
+    return render(request, 'turmas/boletim.html', {'turma': turma, 'avaliacoes': avaliacoes, 'linhas': linhas})
+
+
+@login_required
+def planilha_turma(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    disciplinas = list(turma.disciplinas.filter(professor=request.user))
+    disciplina_id = request.GET.get('disciplina') or ''
+    disciplina = None
+    if disciplina_id:
+        disciplina = next((item for item in disciplinas if str(item.id) == str(disciplina_id)), None)
+    if disciplina is None and disciplinas:
+        disciplina = disciplinas[0]
+
+    alunos = list(turma.alunos.filter(ativo=True))
+    registros = {
+        registro.aluno_id: registro
+        for registro in RegistroAlunoTurma.objects.filter(
+            turma=turma,
+            disciplina=disciplina,
+            aluno__in=alunos,
+        ).select_related('aluno', 'disciplina')
+    }
+    avaliacoes = list(
+        turma.processos_avaliativos.filter(disciplina=disciplina).select_related('disciplina')
+        if disciplina else turma.processos_avaliativos.none()
+    )
+    aulas, resumo_presencas = _resumo_presencas_aulas(turma, disciplina, alunos)
+    aulas_previstas = disciplina.quantidade_aulas if disciplina else 0
+    media_aprovacao = disciplina.media_aprovacao if disciplina else Decimal('6.00')
+    total_aulas = sum(aula.quantidade_aulas for aula in aulas)
+    aulas_restantes = max(aulas_previstas - total_aulas, 0)
+
+    if request.method == 'POST':
+        houve_erro = False
+        for aluno in alunos:
+            registro = registros.get(aluno.id) or RegistroAlunoTurma(turma=turma, aluno=aluno, disciplina=disciplina)
+            registro.total_aulas = total_aulas
+            registro.total_faltas = resumo_presencas.get(aluno.id, {}).get('faltas', 0)
+            registro.observacao = (request.POST.get(f'observacao_{aluno.id}') or '').strip()
+
+            for avaliacao in avaliacoes:
+                valor = (request.POST.get(f'nota_{aluno.id}_{avaliacao.id}') or '').strip().replace(',', '.')
+                observacao_nota = (request.POST.get(f'nota_obs_{aluno.id}_{avaliacao.id}') or '').strip()
+                nota_aluno = NotaAluno.objects.filter(aluno=aluno, processo=avaliacao).first()
+                if not valor:
+                    if nota_aluno:
+                        nota_aluno.delete()
+                    continue
+                if valor:
+                    try:
+                        nota_decimal = Decimal(valor)
+                    except InvalidOperation:
+                        messages.error(request, f'Nota invalida para {aluno.nome} em {avaliacao.titulo}.')
+                        houve_erro = True
+                        continue
+                    nota_aluno = nota_aluno or NotaAluno(aluno=aluno, processo=avaliacao)
+                    nota_aluno.nota = nota_decimal
+                    nota_aluno.observacao = observacao_nota
+                    try:
+                        nota_aluno.full_clean()
+                    except ValidationError as erro:
+                        mensagens = []
+                        for erros_campo in erro.message_dict.values():
+                            mensagens.extend(erros_campo)
+                        messages.error(request, f'{aluno.nome} - {avaliacao.titulo}: {" ".join(mensagens)}')
+                        houve_erro = True
+                    else:
+                        nota_aluno.save()
+
+            try:
+                registro.full_clean()
+            except ValidationError as erro:
+                mensagens = []
+                for erros_campo in erro.message_dict.values():
+                    mensagens.extend(erros_campo)
+                messages.error(request, f'{aluno.nome}: {" ".join(mensagens)}')
+                houve_erro = True
+            else:
+                registro.save()
+                registros[aluno.id] = registro
+
+        if not houve_erro:
+            messages.success(request, 'Planilha salva com sucesso.')
+            if disciplina:
+                return redirect(f'/turmas/{turma.id}/planilha/?disciplina={disciplina.id}')
+            return redirect('planilha_turma', turma_id=turma.id)
+
+    notas = {
+        (nota.aluno_id, nota.processo_id): nota
+        for nota in NotaAluno.objects.filter(aluno__turma=turma, processo__in=avaliacoes)
+    }
+    chaves_periodo = {
+        (_tipo_periodo_registro(avaliacao), _periodo_registro(avaliacao))
+        for avaliacao in avaliacoes
+    } or {('ANUAL', 'ANUAL')}
+
+    grupos = []
+    medias_grafico = {}
+    for grupo_tipo, grupo_periodo in sorted(
+        chaves_periodo,
+        key=lambda chave: (
+            TIPO_PERIODO_ORDEM.get(chave[0], 99),
+            PERIODO_ORDEM.get(chave[1], 99),
+            _titulo_periodo(chave[0], chave[1]),
+        ),
+    ):
+        avaliacoes_grupo = [
+            avaliacao for avaliacao in avaliacoes
+            if (_tipo_periodo_registro(avaliacao), _periodo_registro(avaliacao)) == (grupo_tipo, grupo_periodo)
+        ]
+        linhas = []
+        for aluno in alunos:
+            registro = registros.get(aluno.id) or RegistroAlunoTurma(
+                turma=turma,
+                aluno=aluno,
+                disciplina=disciplina,
+                total_aulas=total_aulas,
+            )
+            registro.total_aulas = total_aulas
+            registro.total_faltas = resumo_presencas.get(aluno.id, {}).get('faltas', 0)
+            cells = []
+            notas_media = []
+            for avaliacao in avaliacoes_grupo:
+                nota = notas.get((aluno.id, avaliacao.id))
+                if nota:
+                    notas_media.append(nota.nota)
+                    medias_grafico.setdefault(aluno.id, []).append(nota.nota)
+                cells.append({'avaliacao': avaliacao, 'nota': nota})
+
+            presenca_dados = resumo_presencas.get(aluno.id, {'total_aulas': 0, 'presencas': 0, 'faltas': 0, 'percentual': None})
+            soma_notas = sum(notas_media, Decimal('0')) if notas_media else None
+            frequencia = presenca_dados.get('percentual')
+            aulas_concluidas = aulas_previstas > 0 and total_aulas >= aulas_previstas
+            media_final = soma_notas if soma_notas is not None else Decimal('0')
+            if not aulas_concluidas:
+                situacao = 'Em andamento'
+                badge = 'text-bg-secondary'
+            elif frequencia is not None and frequencia < Decimal('75.00') and media_final < media_aprovacao:
+                situacao = 'Reprovado por nota e falta'
+                badge = 'text-bg-danger'
+            elif frequencia is not None and frequencia < Decimal('75.00'):
+                situacao = 'Reprovado por falta'
+                badge = 'text-bg-danger'
+            elif media_final < media_aprovacao:
+                situacao = 'Recuperação/Paralela'
+                badge = 'text-bg-warning'
+            else:
+                situacao = 'Aprovado'
+                badge = 'text-bg-success'
+            linhas.append({
+                'aluno': aluno,
+                'registro': registro,
+                'presenca': presenca_dados,
+                'notas': cells,
+                'media': soma_notas,
+                'situacao': situacao,
+                'badge': badge,
+            })
+
+        grupos.append({
+            'titulo': _titulo_periodo(grupo_tipo, grupo_periodo),
+            'badge': PERIODO_BADGES.get(grupo_tipo, 'text-bg-secondary'),
+            'avaliacoes': avaliacoes_grupo,
+            'linhas': linhas,
+        })
+
+    medias_alunos = []
+    for aluno in alunos:
+        notas_aluno = medias_grafico.get(aluno.id, [])
+        if notas_aluno:
+            soma_aluno = sum(notas_aluno, Decimal('0')).quantize(Decimal('0.01'))
+            medias_alunos.append({'aluno': aluno.nome, 'media': float(soma_aluno)})
+    media_geral = None
+    if medias_alunos:
+        media_geral = (sum(Decimal(str(item['media'])) for item in medias_alunos) / len(medias_alunos)).quantize(Decimal('0.01'))
+
+    return render(request, 'turmas/planilha.html', {
+        'turma': turma,
+        'disciplinas_filtro': [
+            {'id': str(item.id), 'nome': item.nome, 'selected': disciplina and item.id == disciplina.id}
+            for item in disciplinas
+        ],
+        'disciplina': disciplina,
+        'total_aulas': total_aulas,
+        'aulas_previstas': aulas_previstas,
+        'aulas_restantes': aulas_restantes,
+        'grupos': grupos,
+        'media_geral': media_geral,
+        'chart_labels': [item['aluno'] for item in medias_alunos],
+        'chart_medias': [item['media'] for item in medias_alunos],
+    })
+
+
+def _linhas_presenca_aula(turma, aula=None):
+    alunos = turma.alunos.filter(ativo=True)
+    presencas = {}
+    if aula:
+        presencas = {presenca.aluno_id: presenca for presenca in aula.presencas.select_related('aluno')}
+    return [{'aluno': aluno, 'presenca': presencas.get(aluno.id)} for aluno in alunos]
+
+
+def _salvar_presencas_aula(request, turma, aula):
+    houve_erro = False
+    for aluno in turma.alunos.filter(ativo=True):
+        presenca = Presenca.objects.filter(aula=aula, aluno=aluno).first() or Presenca(aula=aula, aluno=aluno)
+        presenca.presente = request.POST.get(f'presente_{aluno.id}') == 'on'
+        presenca.observacao = (request.POST.get(f'observacao_{aluno.id}') or '').strip()
+        try:
+            presenca.full_clean()
+        except ValidationError as erro:
+            mensagens = []
+            for erros_campo in erro.message_dict.values():
+                mensagens.extend(erros_campo)
+            messages.error(request, f'{aluno.nome}: {" ".join(mensagens)}')
+            houve_erro = True
+        else:
+            presenca.save()
+    return not houve_erro
+
+
+@login_required
+def chamada_turma(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    disciplinas = list(turma.disciplinas.filter(professor=request.user))
+    disciplina_id = request.GET.get('disciplina') or ''
+    disciplina = None
+    if disciplina_id:
+        disciplina = next((item for item in disciplinas if str(item.id) == str(disciplina_id)), None)
+    if disciplina is None and disciplinas:
+        disciplina = disciplinas[0]
+
+    alunos = list(turma.alunos.filter(ativo=True))
+    aulas = list(turma.aulas.filter(disciplina=disciplina).order_by('data', 'id')) if disciplina else []
+    total_aulas = sum(aula.quantidade_aulas for aula in aulas)
+    presencas = {
+        (presenca.aluno_id, presenca.aula_id): presenca
+        for presenca in Presenca.objects.filter(aula__in=aulas, aluno__in=alunos)
+    }
+    linhas = []
+    for aluno in alunos:
+        cells = []
+        faltas = 0
+        presencas_total = 0
+        for aula in aulas:
+            presenca = presencas.get((aluno.id, aula.id))
+            presente = True if presenca is None else presenca.presente
+            if presente:
+                presencas_total += aula.quantidade_aulas
+            else:
+                faltas += aula.quantidade_aulas
+            cells.append({'aula': aula, 'presenca': presenca, 'presente': presente})
+        linhas.append({
+            'aluno': aluno,
+            'presencas': cells,
+            'faltas': faltas,
+            'percentual': _percentual_presenca(presencas_total, total_aulas),
+        })
+
+    return render(request, 'turmas/chamada.html', {
+        'turma': turma,
+        'disciplina': disciplina,
+        'disciplinas_filtro': [
+            {'id': str(item.id), 'nome': item.nome, 'selected': disciplina and item.id == disciplina.id}
+            for item in disciplinas
+        ],
+        'aulas': aulas,
+        'linhas': linhas,
+    })
+
+
+@login_required
+def registrar_aula(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    form = AulaForm(request.POST or None, turma=turma)
+    linhas = _linhas_presenca_aula(turma)
+    if request.method == 'POST' and form.is_valid():
+        aula = form.save(commit=False)
+        aula.turma = turma
+        try:
+            aula.full_clean()
+        except ValidationError as erro:
+            for erros_campo in erro.message_dict.values():
+                for mensagem in erros_campo:
+                    messages.error(request, mensagem)
+        else:
+            aula.save()
+            if _salvar_presencas_aula(request, turma, aula):
+                messages.success(request, 'Aula registrada com sucesso.')
+                return redirect(f'/turmas/{turma.id}/chamada/?disciplina={aula.disciplina_id}')
+    return render(request, 'turmas/aula_form.html', {'turma': turma, 'form': form, 'linhas': linhas, 'acao': 'Registrar aula'})
+
+
+@login_required
+def editar_chamada(request, turma_id, aula_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    aula = get_object_or_404(Aula.objects.filter(turma=turma), id=aula_id)
+    form = AulaForm(request.POST or None, instance=aula, turma=turma)
+    if request.method == 'POST' and form.is_valid():
+        aula = form.save(commit=False)
+        aula.turma = turma
+        try:
+            aula.full_clean()
+        except ValidationError as erro:
+            for erros_campo in erro.message_dict.values():
+                for mensagem in erros_campo:
+                    messages.error(request, mensagem)
+        else:
+            aula.save()
+            if _salvar_presencas_aula(request, turma, aula):
+                messages.success(request, 'Chamada atualizada com sucesso.')
+                return redirect(f'/turmas/{turma.id}/chamada/?disciplina={aula.disciplina_id}')
+    linhas = _linhas_presenca_aula(turma, aula)
+    return render(request, 'turmas/aula_form.html', {'turma': turma, 'form': form, 'aula': aula, 'linhas': linhas, 'acao': 'Editar chamada'})
+
+
+@login_required
+def presenca_lista(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    chamadas = turma.chamadas.select_related('disciplina').prefetch_related('presencas')
+    return render(request, 'presencas/lista.html', {'turma': turma, 'chamadas': chamadas})
+
+
+@login_required
+def presenca_criar(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    form = ChamadaForm(request.POST or None, turma=turma)
+    linhas = _linhas_presenca(turma)
+
+    if request.method == 'POST' and form.is_valid():
+        chamada = form.save(commit=False)
+        chamada.turma = turma
+        try:
+            chamada.full_clean()
+        except ValidationError as erro:
+            for erros_campo in erro.message_dict.values():
+                for mensagem in erros_campo:
+                    messages.error(request, mensagem)
+        else:
+            chamada.save()
+            if _salvar_presencas_chamada(request, turma, chamada):
+                messages.success(request, 'Presenca lancada com sucesso.')
+                return redirect('presenca_detalhes', turma_id=turma.id, chamada_id=chamada.id)
+
+    return render(request, 'presencas/form.html', {'form': form, 'turma': turma, 'linhas': linhas, 'acao': 'Nova presenca'})
+
+
+@login_required
+def presenca_detalhes(request, turma_id, chamada_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    chamada = get_object_or_404(
+        Chamada.objects.filter(turma=turma).select_related('disciplina'),
+        id=chamada_id,
+    )
+    presencas = chamada.presencas.select_related('aluno')
+    presentes = presencas.filter(presente=True).count()
+    faltas = presencas.filter(presente=False).count()
+    return render(
+        request,
+        'presencas/detalhes.html',
+        {'turma': turma, 'chamada': chamada, 'presencas': presencas, 'presentes': presentes, 'faltas': faltas},
+    )
+
+
+@login_required
+def presenca_editar(request, turma_id, chamada_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    chamada = get_object_or_404(Chamada.objects.filter(turma=turma), id=chamada_id)
+    form = ChamadaForm(request.POST or None, instance=chamada, turma=turma)
+
+    if request.method == 'POST' and form.is_valid():
+        chamada = form.save(commit=False)
+        chamada.turma = turma
+        try:
+            chamada.full_clean()
+        except ValidationError as erro:
+            for erros_campo in erro.message_dict.values():
+                for mensagem in erros_campo:
+                    messages.error(request, mensagem)
+        else:
+            chamada.save()
+            if _salvar_presencas_chamada(request, turma, chamada):
+                messages.success(request, 'Presenca atualizada com sucesso.')
+                return redirect('presenca_detalhes', turma_id=turma.id, chamada_id=chamada.id)
+
+    linhas = _linhas_presenca(turma, chamada)
+    return render(
+        request,
+        'presencas/form.html',
+        {'form': form, 'turma': turma, 'chamada': chamada, 'linhas': linhas, 'acao': 'Editar presenca'},
+    )
+
+
+@login_required
+def presenca_deletar(request, turma_id, chamada_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    chamada = get_object_or_404(Chamada.objects.filter(turma=turma), id=chamada_id)
+    if request.method == 'POST':
+        chamada.delete()
+        messages.success(request, 'Presenca removida com sucesso.')
+        return redirect('presenca_lista', turma_id=turma.id)
+
+    return render(request, 'presencas/confirmar_exclusao.html', {'turma': turma, 'chamada': chamada})
 
 
 @login_required
@@ -376,8 +1156,3 @@ def alterar_senha(request):
         return redirect('perfil_usuario')
 
     return render(request, 'perfil/alterar_senha.html', {'form': form})
-
-
-def logout_usuario(request):
-    logout(request)
-    return redirect('login')

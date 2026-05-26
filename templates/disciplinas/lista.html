@@ -25,6 +25,8 @@
                     <th>Turma</th>
                     <th>Nome</th>
                     <th>Carga horaria</th>
+                    <th>Periodo</th>
+                    <th>Nota total</th>
                     <th>Ano escolar</th>
                     <th class="text-end">Acoes</th>
                 </tr>
@@ -35,6 +37,8 @@
                         <td>{{ disciplina.turma.nome|default:'-' }}</td>
                         <td>{{ disciplina.nome }}</td>
                         <td>{{ disciplina.carga_horaria }}</td>
+                        <td>{{ disciplina.get_tipo_periodo_display }}</td>
+                        <td>{{ disciplina.nota_total }}</td>
                         <td>{{ disciplina.ano_escolar }}</td>
                         <td class="text-end">
                             <a href="{% url 'disciplina_detalhes' disciplina.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
@@ -44,7 +48,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">Nenhuma disciplina cadastrada.</td>
+                        <td colspan="7" class="text-center text-muted py-4">Nenhuma disciplina cadastrada.</td>
                     </tr>
                 {% endfor %}
             </tbody>

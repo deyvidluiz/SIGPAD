@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Detalhes da Presenca | SIGPAD{% endblock %}
+{% block page_title %}Presenca - {{ chamada.data|date:'d/m/Y' }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Turma</dt>
+            <dd class="col-sm-9">{{ turma.nome }}</dd>
+            <dt class="col-sm-3">Disciplina</dt>
+            <dd class="col-sm-9">{{ chamada.disciplina.nome }}</dd>
+            <dt class="col-sm-3">Data</dt>
+            <dd class="col-sm-9">{{ chamada.data|date:'d/m/Y' }}</dd>
+            <dt class="col-sm-3">Descricao</dt>
+            <dd class="col-sm-9">{{ chamada.descricao|default:'-' }}</dd>
+            <dt class="col-sm-3">Resumo</dt>
+            <dd class="col-sm-9">{{ presentes }} presente{{ presentes|pluralize }} / {{ faltas }} falta{{ faltas|pluralize }}</dd>
+        </dl>
+        <div class="d-flex flex-wrap gap-2 mt-4">
+            <a href="{% url 'presenca_editar' turma.id chamada.id %}" class="btn btn-success">Editar presenca</a>
+            <a href="{% url 'presenca_deletar' turma.id chamada.id %}" class="btn btn-outline-danger">Excluir</a>
+            <a href="{% url 'presenca_lista' turma.id %}" class="btn btn-outline-secondary">Voltar</a>
+        </div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white fw-semibold">Alunos</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Aluno</th>
+                    <th>Status</th>
+                    <th>Observacao</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for presenca in presencas %}
+                    <tr>
+                        <td>{{ presenca.aluno.nome }}</td>
+                        <td><span class="badge {% if presenca.presente %}text-bg-success{% else %}text-bg-danger{% endif %}">{% if presenca.presente %}Presente{% else %}Faltou{% endif %}</span></td>
+                        <td>{{ presenca.observacao|default:'-' }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">Nenhuma presenca registrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

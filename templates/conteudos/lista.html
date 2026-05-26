@@ -17,51 +17,68 @@
     {% endif %}
 </div>
 
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Turma</th>
-                    <th>Disciplina</th>
-                    <th>Conteudo</th>
-                    <th>Periodo</th>
-                    <th>Inicio</th>
-                    <th>Fim</th>
-                    <th>Status</th>
-                    <th class="text-end">Acoes</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for conteudo in conteudos %}
+{% for grupo in grupos_periodo %}
+    <section class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge {{ grupo.badge }}">{{ grupo.titulo }}</span>
+                <strong>{{ grupo.titulo }}</strong>
+            </div>
+            <span class="badge text-bg-secondary">{{ grupo.quantidade }} atividade{{ grupo.quantidade|pluralize }}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
                     <tr>
-                        <td>{{ conteudo.disciplina.turma.nome|default:'-' }}</td>
-                        <td>{{ conteudo.disciplina }}</td>
-                        <td>{{ conteudo.titulo }}</td>
-                        <td>{{ conteudo.get_periodo_planejamento_display }}</td>
-                        <td>{{ conteudo.data_inicio|date:'d/m/Y'|default:'-' }}</td>
-                        <td>{{ conteudo.data_fim|date:'d/m/Y'|default:'-' }}</td>
-                        <td><span class="badge {{ conteudo.get_status_badge_class }}">{{ conteudo.get_status_display }}</span></td>
-                        <td class="text-end">
-                            <a href="{% url 'conteudo_detalhes' conteudo.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
-                            {% if not conteudo.concluido %}
-                                <form class="d-inline" method="post" action="{% url 'conteudo_concluir' conteudo.id %}">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="next" value="{% if turma %}{% url 'turma_conteudo_lista' turma.id %}{% else %}{% url 'conteudo_lista' %}{% endif %}">
-                                    <button type="submit" class="btn btn-sm btn-outline-success">Marcar como concluido</button>
-                                </form>
-                            {% endif %}
-                            <a href="{% url 'conteudo_editar' conteudo.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
-                            <a href="{% url 'conteudo_deletar' conteudo.id %}" class="btn btn-sm btn-outline-danger">Excluir</a>
-                        </td>
+                        <th>Turma</th>
+                        <th>Disciplina</th>
+                        <th>Conteudo</th>
+                        <th>Periodo</th>
+                        <th>Inicio</th>
+                        <th>Fim</th>
+                        <th>Arquivo</th>
+                        <th>Status</th>
+                        <th class="text-end">Acoes</th>
                     </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="8" class="text-center text-muted py-4">Nenhum conteudo cadastrado.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for conteudo in grupo.conteudos %}
+                        <tr>
+                            <td>{{ conteudo.disciplina.turma.nome|default:'-' }}</td>
+                            <td>{{ conteudo.disciplina }}</td>
+                            <td>{{ conteudo.titulo }}</td>
+                            <td>{{ conteudo.get_periodo_planejamento_display }}</td>
+                            <td>{{ conteudo.data_inicio|date:'d/m/Y'|default:'-' }}</td>
+                            <td>{{ conteudo.data_fim|date:'d/m/Y'|default:'-' }}</td>
+                            <td>
+                                {% if conteudo.arquivo %}
+                                    <a href="{{ conteudo.arquivo.url }}" class="btn btn-sm btn-outline-primary" target="_blank">Baixar arquivo</a>
+                                {% else %}
+                                    <span class="text-muted">Nenhum arquivo</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge {{ conteudo.get_status_badge_class }}">{{ conteudo.get_status_display }}</span></td>
+                            <td class="text-end">
+                                <a href="{% url 'conteudo_detalhes' conteudo.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
+                                {% if not conteudo.concluido %}
+                                    <form class="d-inline" method="post" action="{% url 'conteudo_concluir' conteudo.id %}">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{% if turma %}{% url 'turma_conteudo_lista' turma.id %}{% else %}{% url 'conteudo_lista' %}{% endif %}">
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Marcar como concluido</button>
+                                    </form>
+                                {% endif %}
+                                <a href="{% url 'conteudo_editar' conteudo.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                                <a href="{% url 'conteudo_deletar' conteudo.id %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+{% empty %}
+    <div class="card border-0 shadow-sm">
+        <div class="card-body text-center text-muted py-4">Nenhum conteudo cadastrado.</div>
     </div>
-</div>
+{% endfor %}
 {% endblock %}

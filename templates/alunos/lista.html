@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Alunos | SIGPAD{% endblock %}
+{% block page_title %}Alunos - {{ turma.nome }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Alunos da turma</h2>
+    <a href="{% url 'aluno_criar' turma.id %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Novo aluno</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Matricula</th>
+                    <th>Status</th>
+                    <th class="text-end">Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for aluno in alunos %}
+                    <tr>
+                        <td>{{ aluno.nome }}</td>
+                        <td>{{ aluno.matricula|default:'-' }}</td>
+                        <td><span class="badge {% if aluno.ativo %}text-bg-success{% else %}text-bg-secondary{% endif %}">{% if aluno.ativo %}Ativo{% else %}Inativo{% endif %}</span></td>
+                        <td class="text-end">
+                            <a href="{% url 'aluno_detalhes' turma.id aluno.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
+                            <a href="{% url 'aluno_editar' turma.id aluno.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                            <a href="{% url 'aluno_deletar' turma.id aluno.id %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">Nenhum aluno cadastrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

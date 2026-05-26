@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Boletim | SIGPAD{% endblock %}
+{% block page_title %}Boletim - {{ turma.nome }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Aluno</th>
+                    {% for avaliacao in avaliacoes %}
+                        <th>
+                            <div class="d-flex flex-column gap-1">
+                                <span>{{ avaliacao.titulo }}</span>
+                                <a class="btn btn-sm btn-outline-success" href="{% url 'planilha_turma' turma.id %}?disciplina={{ avaliacao.disciplina.id }}&tipo_periodo={{ avaliacao.tipo_periodo|default:'ANUAL' }}&periodo={{ avaliacao.periodo|default:'ANUAL' }}">Editar notas</a>
+                            </div>
+                        </th>
+                    {% empty %}
+                        <th>Avaliacoes</th>
+                    {% endfor %}
+                    <th>Media</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linha in linhas %}
+                    <tr>
+                        <td>{{ linha.aluno.nome }}</td>
+                        {% for nota in linha.notas %}
+                            <td>{{ nota|default:'-' }}</td>
+                        {% empty %}
+                            <td class="text-muted">Nenhuma avaliacao</td>
+                        {% endfor %}
+                        <td><strong>{{ linha.media|default:'-' }}</strong></td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="{{ avaliacoes|length|add:2 }}" class="text-center text-muted py-4">Nenhum aluno ativo cadastrado.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

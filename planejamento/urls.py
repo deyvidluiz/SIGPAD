@@ -1,4 +1,4 @@
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import path
 
 from . import views
@@ -6,6 +6,7 @@ from .forms import LoginForm
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('cadastro/', views.cadastro_professor, name='cadastro_professor'),
     path('turmas/', views.turma_lista, name='turma_lista'),
     path('turmas/nova/', views.turma_criar, name='turma_criar'),
     path('turmas/<int:id>/', views.turma_detalhes, name='turma_detalhes'),
@@ -20,6 +21,27 @@ urlpatterns = [
     path('turmas/<int:turma_id>/anotacoes/editar/<int:id>/', views.turma_anotacao_editar, name='turma_anotacao_editar'),
     path('turmas/<int:turma_id>/anotacoes/deletar/<int:id>/', views.turma_anotacao_deletar, name='turma_anotacao_deletar'),
     path('turmas/<int:turma_id>/alertas/', views.turma_alerta_lista, name='turma_alerta_lista'),
+    path('turmas/<int:turma_id>/alunos/', views.aluno_lista, name='aluno_lista'),
+    path('turmas/<int:turma_id>/alunos/novo/', views.aluno_criar, name='aluno_criar'),
+    path('turmas/<int:turma_id>/alunos/<int:id>/', views.aluno_detalhes, name='aluno_detalhes'),
+    path('turmas/<int:turma_id>/alunos/editar/<int:id>/', views.aluno_editar, name='aluno_editar'),
+    path('turmas/<int:turma_id>/alunos/deletar/<int:id>/', views.aluno_deletar, name='aluno_deletar'),
+    path('turmas/<int:turma_id>/avaliacoes/', views.avaliacao_lista, name='avaliacao_lista'),
+    path('turmas/<int:turma_id>/avaliacoes/nova/', views.avaliacao_criar, name='avaliacao_criar'),
+    path('turmas/<int:turma_id>/avaliacoes/<int:id>/', views.avaliacao_detalhes, name='avaliacao_detalhes'),
+    path('turmas/<int:turma_id>/avaliacoes/editar/<int:id>/', views.avaliacao_editar, name='avaliacao_editar'),
+    path('turmas/<int:turma_id>/avaliacoes/deletar/<int:id>/', views.avaliacao_deletar, name='avaliacao_deletar'),
+    path('turmas/<int:turma_id>/avaliacoes/<int:avaliacao_id>/notas/', views.lancar_notas, name='lancar_notas'),
+    path('turmas/<int:turma_id>/boletim/', views.boletim_turma, name='boletim_turma'),
+    path('turmas/<int:turma_id>/planilha/', views.planilha_turma, name='planilha_turma'),
+    path('turmas/<int:turma_id>/chamada/', views.chamada_turma, name='chamada_turma'),
+    path('turmas/<int:turma_id>/chamada/nova/', views.registrar_aula, name='registrar_aula'),
+    path('turmas/<int:turma_id>/chamada/<int:aula_id>/editar/', views.editar_chamada, name='editar_chamada'),
+    path('turmas/<int:turma_id>/presencas/', views.presenca_lista, name='presenca_lista'),
+    path('turmas/<int:turma_id>/presencas/nova/', views.presenca_criar, name='presenca_criar'),
+    path('turmas/<int:turma_id>/presencas/<int:chamada_id>/', views.presenca_detalhes, name='presenca_detalhes'),
+    path('turmas/<int:turma_id>/presencas/editar/<int:chamada_id>/', views.presenca_editar, name='presenca_editar'),
+    path('turmas/<int:turma_id>/presencas/deletar/<int:chamada_id>/', views.presenca_deletar, name='presenca_deletar'),
     path('disciplinas/', views.disciplina_lista, name='disciplina_lista'),
     path('disciplinas/nova/', views.disciplina_criar, name='disciplina_criar'),
     path('disciplinas/<int:id>/', views.disciplina_detalhes, name='disciplina_detalhes'),
@@ -34,9 +56,10 @@ urlpatterns = [
     path('relatorios/', views.relatorio_lista, name='relatorio_lista'),
     path('alertas/', views.alerta_lista, name='alerta_lista'),
     path('alertas/lido/<int:id>/', views.alerta_lido, name='alerta_lido'),
+    path('alertas/excluir/<int:id>/', views.alerta_excluir, name='alerta_excluir'),
     path('perfil/', views.perfil_usuario, name='perfil_usuario'),
     path('perfil/editar/', views.editar_perfil, name='editar_perfil'),
     path('perfil/alterar-senha/', views.alterar_senha, name='alterar_senha'),
     path('login/', LoginView.as_view(template_name='registration/login.html', authentication_form=LoginForm), name='login'),
-    path('logout/', views.logout_usuario, name='logout'),
+    path('logout/', LogoutView.as_view(), name='logout'),
 ]

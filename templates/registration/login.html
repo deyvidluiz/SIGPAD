@@ -37,7 +37,10 @@
                     <label class="form-label" for="{{ form.password.id_for_label }}">Senha</label>
                     {{ form.password }}
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Entrar</button>
+                    <a href="{% url 'cadastro_professor' %}" class="btn btn-outline-secondary">Criar conta</a>
+                </div>
             </form>
         </section>
     </main>

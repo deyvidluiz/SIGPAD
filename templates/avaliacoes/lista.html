@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Avaliacoes | SIGPAD{% endblock %}
+{% block page_title %}Avaliacoes - {{ turma.nome }}{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h5 mb-0">Processos avaliativos</h2>
+    <a href="{% url 'avaliacao_criar' turma.id %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nova avaliacao</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Titulo</th>
+                    <th>Disciplina</th>
+                    <th>Tipo</th>
+                    <th>Valor maximo</th>
+                    <th>Data</th>
+                    <th class="text-end">Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for avaliacao in avaliacoes %}
+                    <tr>
+                        <td>{{ avaliacao.titulo }}</td>
+                        <td>{{ avaliacao.disciplina.nome }}</td>
+                        <td><span class="badge text-bg-primary">{{ avaliacao.get_tipo_display }}</span></td>
+                        <td>{{ avaliacao.valor_maximo }}</td>
+                        <td>{{ avaliacao.data|date:'d/m/Y'|default:'-' }}</td>
+                        <td class="text-end">
+                            <a href="{% url 'avaliacao_detalhes' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
+                            <a href="{% url 'planilha_turma' turma.id %}?disciplina={{ avaliacao.disciplina.id }}&tipo_periodo={{ avaliacao.tipo_periodo|default:'ANUAL' }}&periodo={{ avaliacao.periodo|default:'ANUAL' }}" class="btn btn-sm btn-outline-success">Editar notas</a>
+                            <a href="{% url 'avaliacao_editar' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                            <a href="{% url 'avaliacao_deletar' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">Nenhuma avaliacao cadastrada.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

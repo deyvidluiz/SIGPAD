@@ -17,7 +17,7 @@
 
 {% block content %}
 <section class="row g-3 mt-1" aria-label="Metricas da turma">
-    <div class="col-12 col-md-4">
+    <div class="col-12 col-md-6 col-xl">
         <article class="metric-card metric-primary">
             <div class="metric-top">
                 <span class="metric-label">Disciplinas</span>
@@ -26,7 +26,7 @@
             <div class="metric-value">{{ total_disciplinas|default:0 }}</div>
         </article>
     </div>
-    <div class="col-12 col-md-4">
+    <div class="col-12 col-md-6 col-xl">
         <article class="metric-card metric-success">
             <div class="metric-top">
                 <span class="metric-label">Conteudos</span>
@@ -35,7 +35,25 @@
             <div class="metric-value">{{ total_conteudos|default:0 }}</div>
         </article>
     </div>
-    <div class="col-12 col-md-4">
+    <div class="col-12 col-md-6 col-xl">
+        <article class="metric-card metric-primary">
+            <div class="metric-top">
+                <span class="metric-label">Alunos</span>
+                <span class="metric-icon"><i class="bi bi-person-lines-fill" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_alunos|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl">
+        <article class="metric-card metric-success">
+            <div class="metric-top">
+                <span class="metric-label">Avaliacoes</span>
+                <span class="metric-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_avaliacoes|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl">
         <article class="metric-card metric-warning">
             <div class="metric-top">
                 <span class="metric-label">Alertas</span>
@@ -43,6 +61,27 @@
             </div>
             <div class="metric-value">{{ total_alertas|default:0 }}</div>
         </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl">
+        <article class="metric-card metric-primary">
+            <div class="metric-top">
+                <span class="metric-label">Presencas</span>
+                <span class="metric-icon"><i class="bi bi-calendar-check" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_presencas|default:0 }}</div>
+        </article>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <h2 class="h5 mb-0 section-title"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i><span>Gestao da turma</span></h2>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" href="{% url 'aluno_lista' turma.id %}"><i class="bi bi-person-lines-fill" aria-hidden="true"></i> Alunos</a>
+        <a class="btn btn-outline-primary" href="{% url 'avaliacao_lista' turma.id %}"><i class="bi bi-clipboard-check" aria-hidden="true"></i> Avaliacoes</a>
+        <a class="btn btn-outline-success" href="{% url 'planilha_turma' turma.id %}"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Planilha da turma</a>
+        <a class="btn btn-outline-secondary" href="{% url 'boletim_turma' turma.id %}"><i class="bi bi-table" aria-hidden="true"></i> Boletim da turma</a>
     </div>
 </section>
 
@@ -69,15 +108,65 @@
     <div class="col-12 col-xl-6">
         <div class="panel h-100">
             <div class="panel-header">
+                <h2 class="h5 mb-0 section-title"><i class="bi bi-calendar-check" aria-hidden="true"></i><span>Presencas recentes</span></h2>
+                <a class="btn btn-light btn-sm" href="{% url 'planilha_turma' turma.id %}">Abrir planilha</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for chamada in chamadas %}
+                    <a class="list-group-item list-group-item-action" href="{% url 'planilha_turma' turma.id %}?disciplina={{ chamada.disciplina.id }}&tipo_periodo={{ chamada.tipo_periodo|default:'ANUAL' }}&periodo={{ chamada.periodo|default:'ANUAL' }}">
+                        <strong>{{ chamada.data|date:'d/m/Y' }}</strong>
+                        <span class="text-muted small d-block">{{ chamada.disciplina.nome }} - {{ chamada.descricao|default:'Sem descricao' }}</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">Nenhuma presenca lancada.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-header">
+                <h2 class="h5 mb-0 section-title"><i class="bi bi-clipboard-check" aria-hidden="true"></i><span>Avaliacoes recentes</span></h2>
+                <a class="btn btn-light btn-sm" href="{% url 'avaliacao_lista' turma.id %}">Ver todas</a>
+            </div>
+            <div class="list-group list-group-flush">
+                {% for processo in processos %}
+                    <a class="list-group-item list-group-item-action" href="{% url 'avaliacao_detalhes' turma.id processo.id %}">
+                        <strong>{{ processo.titulo }}</strong>
+                        <span class="text-muted small d-block">{{ processo.disciplina.nome }} - {{ processo.get_tipo_display }} - {{ processo.valor_maximo }} pts</span>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item text-muted">Nenhuma avaliacao cadastrada.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-xl-6">
+        <div class="panel h-100">
+            <div class="panel-header">
                 <h2 class="h5 mb-0 section-title"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><span>Conteudos recentes</span></h2>
                 <a class="btn btn-light btn-sm" href="{% url 'turma_conteudo_lista' turma.id %}">Ver todos</a>
             </div>
             <div class="list-group list-group-flush">
                 {% for conteudo in conteudos %}
-                    <a class="list-group-item list-group-item-action" href="{% url 'conteudo_detalhes' conteudo.id %}">
-                        <strong>{{ conteudo.titulo }}</strong>
-                        <span class="text-muted small d-block">{{ conteudo.disciplina.nome }} - {{ conteudo.get_periodo_planejamento_display }}</span>
-                    </a>
+                    <div class="list-group-item">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <strong>{{ conteudo.titulo }}</strong>
+                                <span class="text-muted small d-block">{{ conteudo.disciplina.nome }} - {{ conteudo.get_periodo_planejamento_display }}</span>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% if conteudo.arquivo %}
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ conteudo.arquivo.url }}" target="_blank">Baixar arquivo</a>
+                                {% else %}
+                                    <span class="text-muted small align-self-center">Nenhum arquivo</span>
+                                {% endif %}
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'conteudo_detalhes' conteudo.id %}">Detalhes</a>
+                            </div>
+                        </div>
+                    </div>
                 {% empty %}
                     <div class="list-group-item text-muted">Nenhum conteudo cadastrado.</div>
                 {% endfor %}

@@ -41,9 +41,9 @@
             <dt class="col-sm-3">Arquivo</dt>
             <dd class="col-sm-9">
                 {% if conteudo.arquivo %}
-                    <a class="btn btn-sm btn-outline-primary" href="{{ conteudo.arquivo.url }}">Baixar arquivo</a>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ conteudo.arquivo.url }}" target="_blank">Baixar arquivo</a>
                 {% else %}
-                    -
+                    <span class="text-muted">Nenhum arquivo</span>
                 {% endif %}
             </dd>
             {% if conteudo.unidade %}

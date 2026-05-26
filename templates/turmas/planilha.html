@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block title %}Planilha da Turma | SIGPAD{% endblock %}
+{% block page_title %}Planilha da turma - {{ turma.nome }}{% endblock %}
+{% block page_subtitle %}Notas por avaliacao, frequencia por disciplina e media da turma.{% endblock %}
+
+{% block turma_subnav %}
+{% include 'turmas/_submenu.html' %}
+{% endblock %}
+
+{% block content %}
+<section class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-12 col-md-8">
+                <label for="disciplina" class="form-label">Disciplina</label>
+                <select id="disciplina" name="disciplina" class="form-control">
+                    {% for item in disciplinas_filtro %}
+                        <option value="{{ item.id }}" {% if item.selected %}selected{% endif %}>{{ item.nome }}</option>
+                    {% empty %}
+                        <option value="">Nenhuma disciplina cadastrada</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12 col-md-2">
+                <label class="form-label">Aulas previstas</label>
+                <input class="form-control" type="number" value="{{ aulas_previstas }}" disabled>
+            </div>
+            <div class="col-12 col-md-2 d-grid">
+                <button class="btn btn-outline-primary" type="submit">Filtrar</button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<form method="post">
+    {% csrf_token %}
+    {% for grupo in grupos %}
+        <section class="card border-0 shadow-sm spreadsheet-panel mb-3">
+            <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                <span class="badge {{ grupo.badge }}">{{ grupo.titulo }}</span>
+                <strong>{{ grupo.titulo }}</strong>
+            </div>
+                <span class="text-muted small">{{ grupo.avaliacoes|length }} avaliacao{{ grupo.avaliacoes|length|pluralize }} | {{ total_aulas }} registrada{{ total_aulas|pluralize }} | {{ aulas_restantes }} restante{{ aulas_restantes|pluralize }}</span>
+            </div>
+
+            <div class="table-responsive spreadsheet-scroll">
+                <table class="table table-bordered table-hover align-middle mb-0 spreadsheet-table">
+                    <thead>
+                        <tr>
+                            <th class="sticky-col aluno-col">Aluno</th>
+                            <th class="text-center numeric-col">Aulas</th>
+                            <th class="text-center numeric-col">Faltas</th>
+                            <th class="text-center numeric-col">Presencas</th>
+                            <th class="text-center numeric-col">% Frequencia</th>
+                            {% for avaliacao in grupo.avaliacoes %}
+                                <th class="text-center nota-col">
+                                    <span class="d-block">{{ avaliacao.titulo }}</span>
+                                    <span class="d-block text-muted small">{{ avaliacao.valor_maximo|unlocalize }} pts</span>
+                                </th>
+                            {% empty %}
+                                <th class="text-center nota-col">Avaliacoes</th>
+                            {% endfor %}
+                            <th class="text-center numeric-col">Media/Soma</th>
+                            <th class="text-center situation-col">Situacao</th>
+                            <th class="text-center actions-col">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for linha in grupo.linhas %}
+                            <tr>
+                                <th class="sticky-col aluno-col bg-white">{{ linha.aluno.nome }}</th>
+                                <td class="text-center fw-semibold">{{ linha.presenca.total_aulas }}</td>
+                                <td class="text-center fw-semibold">{{ linha.presenca.faltas }}</td>
+                                <td class="text-center fw-semibold">{{ linha.presenca.presencas }}</td>
+                                <td class="text-center">
+                                    {% if linha.presenca.percentual is not None %}{{ linha.presenca.percentual }}%{% else %}<span class="text-muted">-</span>{% endif %}
+                                </td>
+                                {% for cell in linha.notas %}
+                                    <td>
+                                        <input class="form-control form-control-sm spreadsheet-input" type="number" step="0.01" min="0" max="{{ cell.avaliacao.valor_maximo|unlocalize }}" name="nota_{{ linha.aluno.id }}_{{ cell.avaliacao.id }}" value="{% if cell.nota %}{{ cell.nota.nota|unlocalize }}{% endif %}">
+                                        <input class="form-control form-control-sm mt-1" type="text" name="nota_obs_{{ linha.aluno.id }}_{{ cell.avaliacao.id }}" value="{% if cell.nota %}{{ cell.nota.observacao|default:'' }}{% endif %}" placeholder="Obs.">
+                                    </td>
+                                {% empty %}
+                                    <td class="text-center text-muted">Cadastre avaliacoes</td>
+                                {% endfor %}
+                                <td class="text-center fw-semibold">{% if linha.media is not None %}{{ linha.media }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td class="text-center"><span class="badge {{ linha.badge }}">{{ linha.situacao }}</span></td>
+                                <td class="text-center">
+                                    <a class="btn btn-sm btn-outline-primary" href="{% url 'aluno_detalhes' turma.id linha.aluno.id %}">Aluno</a>
+                                </td>
+                                <input type="hidden" name="observacao_{{ linha.aluno.id }}" value="{{ linha.registro.observacao|default:'' }}">
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="99" class="text-center text-muted py-4">Nenhum aluno cadastrado nesta turma.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    {% empty %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center text-muted py-4">Nenhuma informacao para exibir.</div>
+        </div>
+    {% endfor %}
+
+    <div class="sticky-save-bar d-flex justify-content-end gap-2">
+        <a href="{% url 'turma_detalhes' turma.id %}" class="btn btn-outline-secondary">Voltar</a>
+        <button type="submit" class="btn btn-primary"><i class="bi bi-save me-1" aria-hidden="true"></i>Salvar planilha</button>
+    </div>
+</form>
+
+<section class="row g-3 mt-3">
+    <div class="col-12 col-xl-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <span class="text-muted small d-block">Media geral da turma</span>
+                <strong class="display-6">{% if media_geral is not None %}{{ media_geral }}{% else %}-{% endif %}</strong>
+                <span class="text-muted small d-block mt-1">{% if disciplina %}{{ disciplina.nome }}{% else %}Sem disciplina cadastrada{% endif %}</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-xl-9">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white fw-semibold">Media dos alunos da turma</div>
+            <div class="card-body">
+                <div style="height: 320px;">
+                    <canvas id="graficoMedias"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{{ chart_labels|json_script:"chart-labels" }}
+{{ chart_medias|json_script:"chart-medias" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  (function () {
+    var canvas = document.getElementById("graficoMedias");
+    if (!canvas || !window.Chart) return;
+    var labels = JSON.parse(document.getElementById("chart-labels").textContent);
+    var medias = JSON.parse(document.getElementById("chart-medias").textContent);
+    new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{
+          label: "Media",
+          data: medias,
+          backgroundColor: "#2563eb",
+          borderRadius: 6,
+          barThickness: 18,
+          maxBarThickness: 22
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: "Media dos alunos da turma" }
+        },
+        scales: {
+          y: { beginAtZero: true, max: 10 }
+        }
+      }
+    });
+  })();
+</script>
+{% endblock %}
