@@ -1,43 +1,135 @@
 {% extends 'base.html' %}
 
-{% block title %}Detalhes da Disciplina | Planejamento PCC{% endblock %}
-{% block page_title %}Detalhes da disciplina{% endblock %}
+{% block title %}{{ disciplina.nome }} | SIGPAD{% endblock %}
+{% block page_title %}{{ disciplina.nome }}{% endblock %}
+{% block page_subtitle %}Planejamento da disciplina e avaliacoes organizados por periodo.{% endblock %}
+
+{% block heading_actions %}
+{% if turma %}
+    <a class="btn btn-outline-primary btn-sm" href="{% url 'avaliacao_criar' turma.id %}"><i class="bi bi-plus-lg"></i>Nova atividade</a>
+    <a class="btn btn-primary btn-sm" href="{% url 'planilha_turma' turma.id %}?disciplina={{ disciplina.id }}"><i class="bi bi-grid-3x3-gap"></i>Avaliacoes e notas</a>
+{% endif %}
+<a href="{% url 'disciplina_editar' disciplina.id %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil-square"></i>Editar</a>
+{% endblock %}
 
 {% block turma_subnav %}
 {% if turma %}{% include 'turmas/_submenu.html' %}{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="card border-0 shadow-sm">
-    <div class="card-body">
-        <h2 class="h5">{{ disciplina.nome|default:'Disciplina' }}</h2>
-        <dl class="row mb-0">
-            <dt class="col-sm-3">Turma</dt>
-            <dd class="col-sm-9">{{ disciplina.turma.nome|default:'-' }}</dd>
-            <dt class="col-sm-3">Carga horaria</dt>
-            <dd class="col-sm-9">{{ disciplina.carga_horaria|default:'-' }}</dd>
-            <dt class="col-sm-3">Tipo de periodo</dt>
-            <dd class="col-sm-9">{{ disciplina.get_tipo_periodo_display|default:'-' }}</dd>
-            <dt class="col-sm-3">Quantidade de aulas</dt>
-            <dd class="col-sm-9">{{ disciplina.quantidade_aulas|default:'-' }}</dd>
-            <dt class="col-sm-3">Nota total por periodo</dt>
-            <dd class="col-sm-9">{{ disciplina.nota_total|default:'-' }}</dd>
-            <dt class="col-sm-3">Media de aprovacao</dt>
-            <dd class="col-sm-9">{{ disciplina.media_aprovacao|default:'-' }}</dd>
-            <dt class="col-sm-3">Ano escolar</dt>
-            <dd class="col-sm-9">{{ disciplina.ano_escolar|default:'-' }}</dd>
-            <dt class="col-sm-3">Descricao</dt>
-            <dd class="col-sm-9">{{ disciplina.descricao|default:'-' }}</dd>
-        </dl>
-        <div class="d-flex gap-2 mt-4">
-            <a href="{% url 'disciplina_editar' disciplina.id %}" class="btn btn-primary">Editar</a>
-            <a href="{% url 'disciplina_deletar' disciplina.id %}" class="btn btn-outline-danger">Excluir</a>
-            {% if turma %}
-                <a href="{% url 'turma_disciplina_lista' turma.id %}" class="btn btn-outline-secondary">Voltar</a>
-            {% else %}
-                <a href="{% url 'disciplina_lista' %}" class="btn btn-outline-secondary">Voltar</a>
-            {% endif %}
+<section class="row g-3 mt-1">
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="metric-card metric-primary">
+            <div class="metric-label">Periodo letivo</div>
+            <div class="metric-value h3 mb-0">{{ disciplina.get_tipo_periodo_display }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="metric-card metric-success">
+            <div class="metric-label">Aulas registradas</div>
+            <div class="metric-value">{{ disciplina.aulas_dadas }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="metric-card metric-warning">
+            <div class="metric-label">Aulas restantes</div>
+            <div class="metric-value">{{ disciplina.aulas_restantes }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-6 col-xl-3">
+        <article class="metric-card metric-danger">
+            <div class="metric-label">Media minima</div>
+            <div class="metric-value">{{ disciplina.media_aprovacao }}</div>
+        </article>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title"><i class="bi bi-journal-text"></i><span>Planejamento da Disciplina</span></h2>
+            <p class="text-muted mb-0">Atividades planejadas, conteudo aplicado, prazos e arquivos anexados.</p>
         </div>
     </div>
-</div>
+
+    {% for grupo in grupos_planejamento %}
+        <div class="period-block mb-4">
+            <div class="period-title">
+                <span class="badge {{ grupo.badge }}">{{ grupo.titulo }}</span>
+            </div>
+            <div class="table-responsive spreadsheet-scroll">
+                <table class="table table-bordered table-hover align-middle mb-0 spreadsheet-table">
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Atividade</th>
+                            <th>Tipo</th>
+                            <th>Valor</th>
+                            <th>Abertura</th>
+                            <th>Fechamento</th>
+                            <th>Conteudo</th>
+                            <th>Status</th>
+                            <th>Arquivo</th>
+                            <th class="text-end">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for atividade in grupo.atividades %}
+                            <tr>
+                                <td>{{ atividade.get_periodo_planejamento_display }}</td>
+                                <td class="fw-semibold">{{ atividade.titulo }}</td>
+                                <td>{{ atividade.tipo }}</td>
+                                <td>{{ atividade.valor_maximo }}</td>
+                                <td>{{ atividade.data_abertura|date:'d/m/Y'|default:'-' }}</td>
+                                <td>{{ atividade.data_fechamento|date:'d/m/Y'|default:'-' }}</td>
+                                <td>{{ atividade.descricao|default:'-'|truncatechars:80 }}</td>
+                                <td><span class="badge text-bg-secondary">{{ atividade.get_status_display }}</span></td>
+                                <td>
+                                    {% if atividade.arquivo %}
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ atividade.arquivo.url }}" download>Baixar</a>
+                                    {% endif %}
+                                    {% for arquivo in atividade.arquivos.all %}
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ arquivo.arquivo.url }}" download>{{ arquivo.nome|truncatechars:18 }}</a>
+                                    {% empty %}
+                                        {% if not atividade.arquivo %}<span class="text-muted">-</span>{% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td class="text-end">
+                                    {% if turma %}
+                                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'avaliacao_detalhes' turma.id atividade.id %}">Detalhes</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% empty %}
+        <div class="text-center text-muted py-4">Nenhuma atividade cadastrada para esta disciplina.</div>
+    {% endfor %}
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title"><i class="bi bi-grid-3x3-gap"></i><span>Avaliacoes e Notas</span></h2>
+            <p class="text-muted mb-0">Abra a planilha Excel da disciplina para lancar notas, recuperacao e paralela.</p>
+        </div>
+        {% if turma %}
+            <a class="btn btn-primary btn-sm" href="{% url 'planilha_turma' turma.id %}?disciplina={{ disciplina.id }}">Abrir planilha</a>
+        {% endif %}
+    </div>
+    <div class="row g-3">
+        <div class="col-12 col-md-4">
+            <div class="mini-card"><span>Nota total por periodo</span><strong>{{ disciplina.nota_total }}</strong></div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="mini-card"><span>Total de atividades</span><strong>{{ avaliacoes.count }}</strong></div>
+        </div>
+        <div class="col-12 col-md-4">
+            <div class="mini-card"><span>Total de aulas</span><strong>{{ disciplina.quantidade_aulas }}</strong></div>
+        </div>
+    </div>
+</section>
 {% endblock %}

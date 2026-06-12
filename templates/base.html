@@ -36,6 +36,14 @@
                     <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
                     <span class="nav-text">Turmas</span>
                 </a>
+                <a class="nav-link {% if 'disciplina' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'disciplina_lista' %}">
+                    <span class="nav-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
+                    <span class="nav-text">Disciplinas</span>
+                </a>
+                <a class="nav-link {% if 'relatorio' in request.resolver_match.url_name or 'exportar' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'relatorio_lista' %}">
+                    <span class="nav-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
+                    <span class="nav-text">Relatorios</span>
+                </a>
                 <a class="nav-link {% if 'alerta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'alerta_lista' %}">
                     <span class="nav-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
                     <span class="nav-text">Alertas</span>

@@ -5,11 +5,13 @@ from django.contrib.auth.models import User
 from .models import (
     Aluno,
     AnotacaoTurma,
+    Arquivo,
     Aula,
     Chamada,
     ConteudoProgramatico,
     Disciplina,
     PerfilUsuario,
+    Recuperacao,
     ProcessoAvaliativo,
     Turma,
 )
@@ -20,6 +22,22 @@ class BootstrapModelForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
             field.widget.attrs.update({'class': 'form-control'})
+
+
+class MultipleFileInput(forms.ClearableFileInput):
+    allow_multiple_selected = True
+
+
+class MultipleFileField(forms.FileField):
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('widget', MultipleFileInput(attrs={'multiple': True}))
+        super().__init__(*args, **kwargs)
+
+    def clean(self, data, initial=None):
+        single_file_clean = super().clean
+        if isinstance(data, (list, tuple)):
+            return [single_file_clean(item, initial) for item in data]
+        return [single_file_clean(data, initial)] if data else []
 
 
 PERIODO_CHOICES_POR_TIPO = {
@@ -171,12 +189,29 @@ class AlunoForm(BootstrapModelForm):
 
 
 class ProcessoAvaliativoForm(BootstrapModelForm):
+    anexos = MultipleFileField(label='Arquivos anexos', required=False)
+
     class Meta:
         model = ProcessoAvaliativo
-        fields = ['disciplina', 'periodo', 'titulo', 'tipo', 'valor_maximo', 'data', 'descricao']
+        fields = [
+            'disciplina',
+            'periodo',
+            'titulo',
+            'tipo',
+            'valor_maximo',
+            'data_abertura',
+            'data_fechamento',
+            'data',
+            'descricao',
+            'observacao',
+            'arquivo',
+        ]
         widgets = {
             'descricao': forms.Textarea(attrs={'rows': 4}),
+            'observacao': forms.Textarea(attrs={'rows': 3}),
             'data': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'data_abertura': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'data_fechamento': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -184,6 +219,11 @@ class ProcessoAvaliativoForm(BootstrapModelForm):
         super().__init__(*args, **kwargs)
         if turma is not None:
             self.fields['disciplina'].queryset = Disciplina.objects.filter(turma=turma)
+        self.fields['tipo'].widget = forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Ex.: Prova escrita, Trabalho em grupo, Debate',
+        })
+        self.fields['descricao'].label = 'Conteudo aplicado'
         self._filtrar_periodo_por_disciplina(turma)
 
     def _filtrar_periodo_por_disciplina(self, turma=None):
@@ -210,6 +250,8 @@ class ProcessoAvaliativoForm(BootstrapModelForm):
             avaliacao.full_clean()
             avaliacao.save()
             self.save_m2m()
+            for arquivo in self.cleaned_data.get('anexos') or []:
+                Arquivo.objects.create(atividade=avaliacao, arquivo=arquivo)
         return avaliacao
 
 
@@ -280,6 +322,8 @@ class ChamadaForm(BootstrapModelForm):
 
 
 class AulaForm(BootstrapModelForm):
+    anexos = MultipleFileField(label='Arquivos/anexos da aula', required=False)
+
     class Meta:
         model = Aula
         fields = ['disciplina', 'data', 'quantidade_aulas', 'conteudo_aplicado', 'observacao']
@@ -294,6 +338,30 @@ class AulaForm(BootstrapModelForm):
         super().__init__(*args, **kwargs)
         if turma is not None:
             self.fields['disciplina'].queryset = Disciplina.objects.filter(turma=turma)
+
+    def save(self, commit=True):
+        aula = super().save(commit=commit)
+        if commit:
+            for arquivo in self.cleaned_data.get('anexos') or []:
+                Arquivo.objects.create(aula=aula, arquivo=arquivo)
+        return aula
+
+
+class RecuperacaoForm(BootstrapModelForm):
+    class Meta:
+        model = Recuperacao
+        fields = ['periodo', 'nota_recuperacao', 'nota_paralela', 'observacao']
+        widgets = {
+            'observacao': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        disciplina = kwargs.pop('disciplina', None)
+        super().__init__(*args, **kwargs)
+        if disciplina is not None:
+            self.fields['periodo'].choices = disciplina.periodos_disponiveis()
+            if disciplina.tipo_periodo == 'ANUAL':
+                self.fields['periodo'].initial = 'ANUAL'
 
 
 class UsuarioPerfilForm(forms.ModelForm):

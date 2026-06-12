@@ -8,7 +8,7 @@
 {% endblock %}
 
 {% block content %}
-<form method="post">
+<form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <section class="card border-0 shadow-sm mb-3">
         <div class="card-body">
@@ -23,6 +23,20 @@
             {% endfor %}
         </div>
     </section>
+
+    {% if aula and aula.arquivos.all %}
+        <section class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white fw-semibold">Arquivos da aula</div>
+            <div class="list-group list-group-flush">
+                {% for arquivo in aula.arquivos.all %}
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" href="{{ arquivo.arquivo.url }}" download>
+                        <span><i class="bi bi-paperclip me-2" aria-hidden="true"></i>{{ arquivo.nome }}</span>
+                        <span class="badge text-bg-light">Baixar</span>
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
 
     <section class="card border-0 shadow-sm">
         <div class="card-header bg-white fw-semibold">Presenca dos alunos</div>

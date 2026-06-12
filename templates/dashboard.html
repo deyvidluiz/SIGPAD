@@ -37,13 +37,52 @@
     <div class="col-12 col-sm-6 col-xl-3">
         <article class="metric-card metric-warning">
             <div class="metric-top">
-                <span class="metric-label">Conteudos</span>
-                <span class="metric-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+                <span class="metric-label">Atividades pendentes</span>
+                <span class="metric-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
             </div>
-            <div class="metric-value">{{ total_conteudos|default:0 }}</div>
+            <div class="metric-value">{{ atividades_pendentes|default:0 }}</div>
         </article>
     </div>
 
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-danger">
+            <div class="metric-top">
+                <span class="metric-label">Baixa frequencia</span>
+                <span class="metric-icon"><i class="bi bi-person-dash" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ alunos_baixa_frequencia|default:0 }}</div>
+        </article>
+    </div>
+</section>
+
+<section class="row g-3 mt-1" aria-label="Indicadores academicos">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-success">
+            <div class="metric-top">
+                <span class="metric-label">Atividades corrigidas</span>
+                <span class="metric-icon"><i class="bi bi-check2-circle" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ atividades_corrigidas|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-primary">
+            <div class="metric-top">
+                <span class="metric-label">Aulas dadas</span>
+                <span class="metric-icon"><i class="bi bi-easel2" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ total_aulas_dadas|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-warning">
+            <div class="metric-top">
+                <span class="metric-label">Abaixo da media</span>
+                <span class="metric-icon"><i class="bi bi-graph-down" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ alunos_abaixo_media|default:0 }}</div>
+        </article>
+    </div>
     <div class="col-12 col-sm-6 col-xl-3">
         <article class="metric-card metric-danger">
             <div class="metric-top">

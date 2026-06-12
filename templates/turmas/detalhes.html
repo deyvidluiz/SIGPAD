@@ -29,10 +29,10 @@
     <div class="col-12 col-md-6 col-xl">
         <article class="metric-card metric-success">
             <div class="metric-top">
-                <span class="metric-label">Conteudos</span>
-                <span class="metric-icon"><i class="bi bi-file-earmark-text" aria-hidden="true"></i></span>
+                <span class="metric-label">Aulas registradas</span>
+                <span class="metric-icon"><i class="bi bi-easel2" aria-hidden="true"></i></span>
             </div>
-            <div class="metric-value">{{ total_conteudos|default:0 }}</div>
+            <div class="metric-value">{{ aulas_registradas|default:0 }}</div>
         </article>
     </div>
     <div class="col-12 col-md-6 col-xl">
@@ -65,10 +65,40 @@
     <div class="col-12 col-md-6 col-xl">
         <article class="metric-card metric-primary">
             <div class="metric-top">
-                <span class="metric-label">Presencas</span>
-                <span class="metric-icon"><i class="bi bi-calendar-check" aria-hidden="true"></i></span>
+                <span class="metric-label">Aulas restantes</span>
+                <span class="metric-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span>
             </div>
-            <div class="metric-value">{{ total_presencas|default:0 }}</div>
+            <div class="metric-value">{{ aulas_restantes|default:0 }}</div>
+        </article>
+    </div>
+</section>
+
+<section class="row g-3 mt-1" aria-label="Alunos em risco">
+    <div class="col-12 col-md-4">
+        <article class="metric-card metric-warning">
+            <div class="metric-top">
+                <span class="metric-label">Abaixo da media</span>
+                <span class="metric-icon"><i class="bi bi-graph-down" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ alunos_abaixo_media|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="metric-card metric-danger">
+            <div class="metric-top">
+                <span class="metric-label">Baixa frequencia</span>
+                <span class="metric-icon"><i class="bi bi-person-dash" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ alunos_baixa_frequencia|default:0 }}</div>
+        </article>
+    </div>
+    <div class="col-12 col-md-4">
+        <article class="metric-card metric-primary">
+            <div class="metric-top">
+                <span class="metric-label">Recuperacao/Paralela</span>
+                <span class="metric-icon"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></span>
+            </div>
+            <div class="metric-value">{{ alunos_recuperacao|default:0 }}</div>
         </article>
     </div>
 </section>
@@ -79,8 +109,11 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
         <a class="btn btn-outline-primary" href="{% url 'aluno_lista' turma.id %}"><i class="bi bi-person-lines-fill" aria-hidden="true"></i> Alunos</a>
-        <a class="btn btn-outline-primary" href="{% url 'avaliacao_lista' turma.id %}"><i class="bi bi-clipboard-check" aria-hidden="true"></i> Avaliacoes</a>
-        <a class="btn btn-outline-success" href="{% url 'planilha_turma' turma.id %}"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Planilha da turma</a>
+        <a class="btn btn-outline-primary" href="{% url 'avaliacao_lista' turma.id %}"><i class="bi bi-journal-text" aria-hidden="true"></i> Planejamento</a>
+        <a class="btn btn-outline-success" href="{% url 'planilha_turma' turma.id %}"><i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> Avaliacoes e notas</a>
+        {% if primeira_avaliacao %}
+            <a class="btn btn-outline-secondary" href="{% url 'relatorio_final' turma.id %}?disciplina={{ primeira_avaliacao.disciplina.id }}"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Relatorio final</a>
+        {% endif %}
         <a class="btn btn-outline-secondary" href="{% url 'boletim_turma' turma.id %}"><i class="bi bi-table" aria-hidden="true"></i> Boletim da turma</a>
     </div>
 </section>
@@ -109,7 +142,7 @@
         <div class="panel h-100">
             <div class="panel-header">
                 <h2 class="h5 mb-0 section-title"><i class="bi bi-calendar-check" aria-hidden="true"></i><span>Presencas recentes</span></h2>
-                <a class="btn btn-light btn-sm" href="{% url 'planilha_turma' turma.id %}">Abrir planilha</a>
+                <a class="btn btn-light btn-sm" href="{% url 'chamada_turma' turma.id %}">Abrir chamada</a>
             </div>
             <div class="list-group list-group-flush">
                 {% for chamada in chamadas %}
@@ -134,7 +167,7 @@
                 {% for processo in processos %}
                     <a class="list-group-item list-group-item-action" href="{% url 'avaliacao_detalhes' turma.id processo.id %}">
                         <strong>{{ processo.titulo }}</strong>
-                        <span class="text-muted small d-block">{{ processo.disciplina.nome }} - {{ processo.get_tipo_display }} - {{ processo.valor_maximo }} pts</span>
+                        <span class="text-muted small d-block">{{ processo.disciplina.nome }} - {{ processo.tipo }} - {{ processo.valor_maximo }} pts</span>
                     </a>
                 {% empty %}
                     <div class="list-group-item text-muted">Nenhuma avaliacao cadastrada.</div>

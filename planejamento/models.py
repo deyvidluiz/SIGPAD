@@ -6,6 +6,55 @@ from django.db import models
 from django.utils import timezone
 
 
+PERIODO_CHOICES = [
+    ('1_BIMESTRE', '1º bimestre'),
+    ('2_BIMESTRE', '2º bimestre'),
+    ('3_BIMESTRE', '3º bimestre'),
+    ('4_BIMESTRE', '4º bimestre'),
+    ('1_TRIMESTRE', '1º trimestre'),
+    ('2_TRIMESTRE', '2º trimestre'),
+    ('3_TRIMESTRE', '3º trimestre'),
+    ('1_SEMESTRE', '1º semestre'),
+    ('2_SEMESTRE', '2º semestre'),
+    ('ANUAL', 'Anual'),
+]
+
+TIPO_PERIODO_CHOICES = [
+    ('BIMESTRE', 'Bimestre'),
+    ('TRIMESTRE', 'Trimestre'),
+    ('SEMESTRE', 'Semestre'),
+    ('ANUAL', 'Anual'),
+]
+
+PERIODOS_POR_TIPO = {
+    'BIMESTRE': [
+        ('1_BIMESTRE', '1º bimestre'),
+        ('2_BIMESTRE', '2º bimestre'),
+        ('3_BIMESTRE', '3º bimestre'),
+        ('4_BIMESTRE', '4º bimestre'),
+    ],
+    'TRIMESTRE': [
+        ('1_TRIMESTRE', '1º trimestre'),
+        ('2_TRIMESTRE', '2º trimestre'),
+        ('3_TRIMESTRE', '3º trimestre'),
+    ],
+    'SEMESTRE': [
+        ('1_SEMESTRE', '1º semestre'),
+        ('2_SEMESTRE', '2º semestre'),
+    ],
+    'ANUAL': [
+        ('ANUAL', 'Anual'),
+    ],
+}
+
+
+class Professor(User):
+    class Meta:
+        proxy = True
+        verbose_name = 'Professor'
+        verbose_name_plural = 'Professores'
+
+
 class Turma(models.Model):
     TURNO_CHOICES = [
         ('MATUTINO', 'Matutino'),
@@ -38,12 +87,7 @@ class Turma(models.Model):
 
 
 class Disciplina(models.Model):
-    TIPO_PERIODO_CHOICES = [
-        ('BIMESTRE', 'Bimestre'),
-        ('TRIMESTRE', 'Trimestre'),
-        ('SEMESTRE', 'Semestre'),
-        ('ANUAL', 'Anual'),
-    ]
+    TIPO_PERIODO_CHOICES = TIPO_PERIODO_CHOICES
 
     turma = models.ForeignKey(
         Turma,
@@ -82,6 +126,53 @@ class Disciplina(models.Model):
         if not self.quantidade_aulas:
             self.quantidade_aulas = self.carga_horaria
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        self.criar_periodos_letivos()
+
+    def criar_periodos_letivos(self):
+        for ordem, (codigo, nome) in enumerate(PERIODOS_POR_TIPO.get(self.tipo_periodo, []), start=1):
+            PeriodoLetivo.objects.get_or_create(
+                disciplina=self,
+                codigo=codigo,
+                defaults={'tipo': self.tipo_periodo, 'nome': nome, 'ordem': ordem},
+            )
+
+    @property
+    def aulas_dadas(self):
+        return self.aulas.aggregate(total=models.Sum('quantidade_aulas'))['total'] or 0
+
+    @property
+    def aulas_restantes(self):
+        return max(self.quantidade_aulas - self.aulas_dadas, 0)
+
+    @property
+    def ano_letivo(self):
+        return self.turma.ano_letivo if self.turma_id else None
+
+    def periodos_disponiveis(self):
+        return PERIODOS_POR_TIPO.get(self.tipo_periodo, [])
+
+
+class PeriodoLetivo(models.Model):
+    disciplina = models.ForeignKey(Disciplina, verbose_name='disciplina', on_delete=models.CASCADE, related_name='periodos_letivos')
+    tipo = models.CharField('tipo', max_length=20, choices=TIPO_PERIODO_CHOICES)
+    codigo = models.CharField('codigo', max_length=20, choices=PERIODO_CHOICES)
+    nome = models.CharField('nome', max_length=80)
+    ordem = models.PositiveSmallIntegerField('ordem', default=1)
+    ativo = models.BooleanField('ativo', default=True)
+
+    class Meta:
+        verbose_name = 'Periodo letivo'
+        verbose_name_plural = 'Periodos letivos'
+        ordering = ['disciplina__nome', 'ordem']
+        constraints = [
+            models.UniqueConstraint(fields=['disciplina', 'codigo'], name='periodo_unico_por_disciplina'),
+        ]
+
+    def __str__(self):
+        return f'{self.disciplina} - {self.nome}'
+
 
 class ConteudoProgramatico(models.Model):
     STATUS_CHOICES = [
@@ -98,25 +189,9 @@ class ConteudoProgramatico(models.Model):
         (4, '4º bimestre'),
     ]
 
-    TIPO_PERIODO_CHOICES = [
-        ('BIMESTRE', 'Bimestre'),
-        ('TRIMESTRE', 'Trimestre'),
-        ('SEMESTRE', 'Semestre'),
-        ('ANUAL', 'Anual'),
-    ]
+    TIPO_PERIODO_CHOICES = TIPO_PERIODO_CHOICES
 
-    PERIODO_CHOICES = [
-        ('1_BIMESTRE', '1º bimestre'),
-        ('2_BIMESTRE', '2º bimestre'),
-        ('3_BIMESTRE', '3º bimestre'),
-        ('4_BIMESTRE', '4º bimestre'),
-        ('1_TRIMESTRE', '1º trimestre'),
-        ('2_TRIMESTRE', '2º trimestre'),
-        ('3_TRIMESTRE', '3º trimestre'),
-        ('1_SEMESTRE', '1º semestre'),
-        ('2_SEMESTRE', '2º semestre'),
-        ('ANUAL', 'Anual'),
-    ]
+    PERIODO_CHOICES = PERIODO_CHOICES
 
     disciplina = models.ForeignKey(
         Disciplina,
@@ -239,16 +314,11 @@ class Aluno(models.Model):
 
 
 class ProcessoAvaliativo(models.Model):
-    TIPO_CHOICES = [
-        ('PROVA', 'Prova'),
-        ('SEMINARIO', 'Seminario'),
-        ('TRABALHO', 'Trabalho'),
-        ('ATIVIDADE', 'Atividade em sala'),
-        ('PARTICIPACAO', 'Participacao'),
-        ('PROJETO', 'Projeto'),
-        ('RECUPERACAO', 'Recuperacao'),
-        ('PARALELA', 'Paralela'),
-        ('OUTRO', 'Outro'),
+    STATUS_CHOICES = [
+        ('A_REALIZAR', 'A realizar'),
+        ('EM_ANDAMENTO', 'Em andamento'),
+        ('CORRIGIDA', 'Corrigida'),
+        ('FINALIZADA', 'Finalizada'),
     ]
 
     turma = models.ForeignKey(
@@ -264,8 +334,9 @@ class ProcessoAvaliativo(models.Model):
         related_name='processos_avaliativos',
     )
     titulo = models.CharField('titulo', max_length=150)
-    descricao = models.TextField('descricao', blank=True, null=True)
-    tipo = models.CharField('tipo', max_length=20, choices=TIPO_CHOICES)
+    descricao = models.TextField('conteudo aplicado', blank=True, null=True)
+    observacao = models.TextField('observacao', blank=True, null=True)
+    tipo = models.CharField('tipo', max_length=100)
     valor_maximo = models.DecimalField('valor maximo', max_digits=5, decimal_places=2)
     tipo_periodo = models.CharField(
         'tipo de periodo',
@@ -281,6 +352,10 @@ class ProcessoAvaliativo(models.Model):
         null=True,
         blank=True,
     )
+    data_abertura = models.DateField('data de abertura', blank=True, null=True)
+    data_fechamento = models.DateField('data de fechamento', blank=True, null=True)
+    status = models.CharField('status', max_length=20, choices=STATUS_CHOICES, default='A_REALIZAR')
+    arquivo = models.FileField('arquivo', upload_to='atividades/', blank=True, null=True)
     data = models.DateField('data', blank=True, null=True)
     created_at = models.DateTimeField('criado em', auto_now_add=True)
 
@@ -292,6 +367,9 @@ class ProcessoAvaliativo(models.Model):
     def __str__(self):
         return self.titulo
 
+    def get_tipo_display(self):
+        return self.tipo
+
     def clean(self):
         super().clean()
         if self.disciplina_id and self.turma_id and self.disciplina.turma_id != self.turma_id:
@@ -300,21 +378,47 @@ class ProcessoAvaliativo(models.Model):
             raise ValidationError({'valor_maximo': 'O valor maximo deve ser maior que zero.'})
         if self.disciplina_id:
             self.tipo_periodo = self.disciplina.tipo_periodo
+            if self.tipo_periodo == 'ANUAL':
+                self.periodo = 'ANUAL'
             if self.periodo and not self.periodo.endswith(self.disciplina.tipo_periodo) and self.periodo != 'ANUAL':
                 raise ValidationError({'periodo': 'O periodo deve respeitar o tipo de periodo da disciplina.'})
-            total = ProcessoAvaliativo.objects.filter(
-                disciplina=self.disciplina,
-                periodo=self.periodo,
-            ).exclude(pk=self.pk).aggregate(total=models.Sum('valor_maximo'))['total'] or Decimal('0')
-            if self.valor_maximo is not None and total + self.valor_maximo > self.disciplina.nota_total:
-                raise ValidationError({
-                    'valor_maximo': 'A soma das avaliacoes deste periodo ultrapassa a nota total definida para a disciplina.'
-                })
+        if self.data_abertura and self.data_fechamento and self.data_abertura > self.data_fechamento:
+            raise ValidationError({'data_fechamento': 'A data de fechamento deve ser posterior a abertura.'})
+
+    def save(self, *args, **kwargs):
+        if self.disciplina_id:
+            self.tipo_periodo = self.disciplina.tipo_periodo
+            if self.tipo_periodo == 'ANUAL':
+                self.periodo = 'ANUAL'
+        if self.status not in ['CORRIGIDA', 'FINALIZADA']:
+            self.atualizar_status_automatico(salvar=False)
+        super().save(*args, **kwargs)
 
     def get_periodo_planejamento_display(self):
         if self.periodo:
             return self.get_periodo_display()
         return 'Anual'
+
+    def atualizar_status_automatico(self, salvar=True):
+        hoje = timezone.localdate()
+        if self.status in ['CORRIGIDA', 'FINALIZADA']:
+            return self.status
+        if self.data_abertura and hoje < self.data_abertura:
+            self.status = 'A_REALIZAR'
+        elif self.data_fechamento and hoje > self.data_fechamento:
+            self.status = 'FINALIZADA'
+        else:
+            self.status = 'EM_ANDAMENTO'
+        if salvar:
+            self.save(update_fields=['status'])
+        return self.status
+
+
+class Atividade(ProcessoAvaliativo):
+    class Meta:
+        proxy = True
+        verbose_name = 'Atividade'
+        verbose_name_plural = 'Atividades'
 
 
 class NotaAluno(models.Model):
@@ -349,6 +453,48 @@ class NotaAluno(models.Model):
             raise ValidationError({'nota': 'A nota nao pode ser maior que o valor maximo.'})
         if self.aluno_id and self.processo_id and self.aluno.turma_id != self.processo.turma_id:
             raise ValidationError({'aluno': 'O aluno deve pertencer a turma da avaliacao.'})
+
+
+class Nota(NotaAluno):
+    class Meta:
+        proxy = True
+        verbose_name = 'Nota'
+        verbose_name_plural = 'Notas'
+
+
+class Recuperacao(models.Model):
+    aluno = models.ForeignKey(Aluno, verbose_name='aluno', on_delete=models.CASCADE, related_name='recuperacoes')
+    disciplina = models.ForeignKey(Disciplina, verbose_name='disciplina', on_delete=models.CASCADE, related_name='recuperacoes')
+    periodo = models.CharField('periodo', max_length=20, choices=PERIODO_CHOICES, default='ANUAL')
+    nota_recuperacao = models.DecimalField('nota de recuperacao', max_digits=5, decimal_places=2, blank=True, null=True)
+    nota_paralela = models.DecimalField('nota paralela', max_digits=5, decimal_places=2, blank=True, null=True)
+    observacao = models.TextField('observacao', blank=True, null=True)
+    updated_at = models.DateTimeField('atualizado em', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Recuperacao'
+        verbose_name_plural = 'Recuperacoes'
+        ordering = ['aluno__nome', 'disciplina__nome', 'periodo']
+        constraints = [
+            models.UniqueConstraint(fields=['aluno', 'disciplina', 'periodo'], name='recuperacao_unica_por_aluno_disciplina_periodo'),
+        ]
+
+    def __str__(self):
+        return f'{self.aluno} - {self.disciplina} - {self.periodo}'
+
+    @property
+    def melhor_nota(self):
+        notas = [nota for nota in [self.nota_recuperacao, self.nota_paralela] if nota is not None]
+        return max(notas) if notas else None
+
+    def clean(self):
+        super().clean()
+        if self.aluno_id and self.disciplina_id and self.aluno.turma_id != self.disciplina.turma_id:
+            raise ValidationError({'aluno': 'O aluno deve pertencer a turma da disciplina.'})
+        for campo in ['nota_recuperacao', 'nota_paralela']:
+            nota = getattr(self, campo)
+            if nota is not None and (nota < 0 or nota > self.disciplina.nota_total):
+                raise ValidationError({campo: 'A nota deve estar dentro da nota total da disciplina.'})
 
 
 class Chamada(models.Model):
@@ -475,6 +621,34 @@ class Presenca(models.Model):
         super().clean()
         if self.aluno_id and self.aula_id and self.aluno.turma_id != self.aula.turma_id:
             raise ValidationError({'aluno': 'O aluno deve pertencer a turma da aula.'})
+
+
+class Arquivo(models.Model):
+    aula = models.ForeignKey(Aula, verbose_name='aula', on_delete=models.CASCADE, related_name='arquivos', null=True, blank=True)
+    atividade = models.ForeignKey(ProcessoAvaliativo, verbose_name='atividade', on_delete=models.CASCADE, related_name='arquivos', null=True, blank=True)
+    conteudo = models.ForeignKey(ConteudoProgramatico, verbose_name='conteudo', on_delete=models.CASCADE, related_name='arquivos_extras', null=True, blank=True)
+    nome = models.CharField('nome', max_length=180, blank=True)
+    arquivo = models.FileField('arquivo', upload_to='academico/')
+    created_at = models.DateTimeField('criado em', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Arquivo'
+        verbose_name_plural = 'Arquivos'
+        ordering = ['-created_at', 'nome']
+
+    def __str__(self):
+        return self.nome or self.arquivo.name
+
+    def clean(self):
+        super().clean()
+        vinculos = [self.aula_id, self.atividade_id, self.conteudo_id]
+        if sum(1 for vinculo in vinculos if vinculo) != 1:
+            raise ValidationError('Informe exatamente um vinculo para o arquivo.')
+
+    def save(self, *args, **kwargs):
+        if not self.nome and self.arquivo:
+            self.nome = self.arquivo.name.rsplit('/', 1)[-1]
+        super().save(*args, **kwargs)
 
 
 class RegistroAlunoTurma(models.Model):

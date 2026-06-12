@@ -16,13 +16,34 @@
             <dt class="col-sm-3">Disciplina</dt>
             <dd class="col-sm-9">{{ avaliacao.disciplina.nome }}</dd>
             <dt class="col-sm-3">Tipo</dt>
-            <dd class="col-sm-9">{{ avaliacao.get_tipo_display }}</dd>
+            <dd class="col-sm-9">{{ avaliacao.tipo }}</dd>
             <dt class="col-sm-3">Valor maximo</dt>
             <dd class="col-sm-9">{{ avaliacao.valor_maximo }}</dd>
+            <dt class="col-sm-3">Periodo</dt>
+            <dd class="col-sm-9">{{ avaliacao.get_periodo_planejamento_display }}</dd>
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9">{{ avaliacao.get_status_display }}</dd>
+            <dt class="col-sm-3">Abertura</dt>
+            <dd class="col-sm-9">{{ avaliacao.data_abertura|date:'d/m/Y'|default:'-' }}</dd>
+            <dt class="col-sm-3">Fechamento</dt>
+            <dd class="col-sm-9">{{ avaliacao.data_fechamento|date:'d/m/Y'|default:'-' }}</dd>
             <dt class="col-sm-3">Data</dt>
             <dd class="col-sm-9">{{ avaliacao.data|date:'d/m/Y'|default:'-' }}</dd>
-            <dt class="col-sm-3">Descricao</dt>
+            <dt class="col-sm-3">Arquivos</dt>
+            <dd class="col-sm-9">
+                {% if avaliacao.arquivo %}
+                    <a href="{{ avaliacao.arquivo.url }}" download>{{ avaliacao.arquivo.name }}</a><br>
+                {% endif %}
+                {% for arquivo in avaliacao.arquivos.all %}
+                    <a href="{{ arquivo.arquivo.url }}" download>{{ arquivo.nome }}</a>{% if not forloop.last %}<br>{% endif %}
+                {% empty %}
+                    {% if not avaliacao.arquivo %}-{% endif %}
+                {% endfor %}
+            </dd>
+            <dt class="col-sm-3">Conteudo aplicado</dt>
             <dd class="col-sm-9">{{ avaliacao.descricao|default:'-' }}</dd>
+            <dt class="col-sm-3">Observacao</dt>
+            <dd class="col-sm-9">{{ avaliacao.observacao|default:'-' }}</dd>
         </dl>
         <div class="d-flex flex-wrap gap-2 mt-4">
             <a href="{% url 'planilha_turma' turma.id %}?disciplina={{ avaliacao.disciplina.id }}&tipo_periodo={{ avaliacao.tipo_periodo|default:'ANUAL' }}&periodo={{ avaliacao.periodo|default:'ANUAL' }}" class="btn btn-success">Editar notas na planilha</a>

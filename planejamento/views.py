@@ -4,6 +4,8 @@ from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -18,6 +20,7 @@ from .forms import (
     DisciplinaForm,
     PerfilUsuarioForm,
     ProcessoAvaliativoForm,
+    RecuperacaoForm,
     TurmaForm,
     UsuarioPerfilForm,
 )
@@ -25,6 +28,7 @@ from .models import (
     Alerta,
     Aluno,
     AnotacaoTurma,
+    Arquivo,
     Aula,
     Chamada,
     ConteudoProgramatico,
@@ -34,6 +38,7 @@ from .models import (
     Presenca,
     PresencaAluno,
     ProcessoAvaliativo,
+    Recuperacao,
     RegistroAlunoTurma,
     Turma,
 )
@@ -193,6 +198,101 @@ def _percentual_presenca(total_presencas, total_aulas):
     return percentual.quantize(Decimal('0.01'))
 
 
+def _situacao_academica(media, frequencia, media_aprovacao, aulas_concluidas=True):
+    media_final = media if media is not None else Decimal('0')
+    if not aulas_concluidas:
+        return 'Em andamento', 'text-bg-secondary'
+    if frequencia is not None and frequencia < Decimal('75.00') and media_final < media_aprovacao:
+        return 'Reprovado por nota e falta', 'text-bg-danger'
+    if frequencia is not None and frequencia < Decimal('75.00'):
+        return 'Reprovado por falta', 'text-bg-danger'
+    if media_final < media_aprovacao:
+        return 'Recuperação/Paralela', 'text-bg-warning'
+    return 'Aprovado', 'text-bg-success'
+
+
+def _media_periodo(soma_notas, total_valor, nota_total):
+    if soma_notas is None:
+        return None
+    if not total_valor:
+        return soma_notas.quantize(Decimal('0.01'))
+    media = (soma_notas / total_valor) * nota_total
+    return media.quantize(Decimal('0.01'))
+
+
+def _media_com_recuperacao(media_periodo, recuperacao, nota_total=Decimal('10.00')):
+    notas = [media_periodo] if media_periodo is not None else []
+    if recuperacao and recuperacao.melhor_nota is not None:
+        notas.append(recuperacao.melhor_nota)
+    if not notas:
+        return None
+    return min(max(notas), nota_total).quantize(Decimal('0.01'))
+
+
+def _grupos_planejamento(avaliacoes):
+    grupos = {}
+    for avaliacao in avaliacoes:
+        avaliacao.atualizar_status_automatico()
+        tipo_periodo = _tipo_periodo_registro(avaliacao)
+        periodo = _periodo_registro(avaliacao)
+        chave = (tipo_periodo, periodo)
+        if chave not in grupos:
+            grupos[chave] = {
+                'tipo_periodo': tipo_periodo,
+                'periodo': periodo,
+                'titulo': _titulo_periodo(tipo_periodo, periodo),
+                'badge': PERIODO_BADGES.get(tipo_periodo, 'text-bg-secondary'),
+                'atividades': [],
+            }
+        grupos[chave]['atividades'].append(avaliacao)
+    return sorted(
+        grupos.values(),
+        key=lambda grupo: (
+            TIPO_PERIODO_ORDEM.get(grupo['tipo_periodo'], 99),
+            PERIODO_ORDEM.get(grupo['periodo'], 99),
+            grupo['titulo'],
+        ),
+    )
+
+
+def _resumo_risco_turma(turma, disciplinas):
+    alunos_abaixo_media = set()
+    alunos_baixa_frequencia = set()
+    alunos_recuperacao = set()
+    aulas_registradas = 0
+    aulas_restantes = 0
+    for disciplina in disciplinas:
+        alunos = list(turma.alunos.filter(ativo=True))
+        _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
+        avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
+        total_valor = sum((avaliacao.valor_maximo for avaliacao in avaliacoes), Decimal('0'))
+        notas_por_aluno = {}
+        for nota in NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes):
+            notas_por_aluno.setdefault(nota.aluno_id, Decimal('0'))
+            notas_por_aluno[nota.aluno_id] += nota.nota
+        total_aulas = disciplina.aulas_dadas
+        aulas_registradas += total_aulas
+        aulas_restantes += max(disciplina.quantidade_aulas - total_aulas, 0)
+        aulas_concluidas = disciplina.quantidade_aulas > 0 and total_aulas >= disciplina.quantidade_aulas
+        for aluno in alunos:
+            media = _media_periodo(notas_por_aluno.get(aluno.id), total_valor, disciplina.nota_total)
+            frequencia = resumo.get(aluno.id, {}).get('percentual')
+            situacao, _ = _situacao_academica(media, frequencia, disciplina.media_aprovacao, aulas_concluidas)
+            if media is not None and media < disciplina.media_aprovacao:
+                alunos_abaixo_media.add(aluno.id)
+            if frequencia is not None and frequencia < Decimal('75.00'):
+                alunos_baixa_frequencia.add(aluno.id)
+            if situacao == 'Recuperação/Paralela':
+                alunos_recuperacao.add(aluno.id)
+    return {
+        'alunos_abaixo_media': len(alunos_abaixo_media),
+        'alunos_baixa_frequencia': len(alunos_baixa_frequencia),
+        'alunos_recuperacao': len(alunos_recuperacao),
+        'aulas_registradas': aulas_registradas,
+        'aulas_restantes': aulas_restantes,
+    }
+
+
 def _resumo_presencas_aulas(turma, disciplina, alunos):
     aulas = list(turma.aulas.filter(disciplina=disciplina).order_by('data', 'id')) if disciplina else []
     total_aulas = sum(aula.quantidade_aulas for aula in aulas)
@@ -232,11 +332,39 @@ def dashboard(request):
     alertas = Alerta.objects.filter(usuario=request.user)
     disciplinas = Disciplina.objects.filter(professor=request.user)
     turmas = Turma.objects.filter(professor=request.user)
+    atividades = ProcessoAvaliativo.objects.filter(turma__professor=request.user)
+    aulas_dadas = Aula.objects.filter(turma__professor=request.user).aggregate(total=Sum('quantidade_aulas'))['total'] or 0
+    alunos_abaixo_media = 0
+    alunos_baixa_frequencia = 0
+    for turma in turmas.prefetch_related('alunos', 'disciplinas'):
+        for disciplina in turma.disciplinas.filter(professor=request.user):
+            alunos = list(turma.alunos.filter(ativo=True))
+            _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
+            avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
+            notas = NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes)
+            notas_por_aluno = {}
+            for nota in notas:
+                notas_por_aluno.setdefault(nota.aluno_id, Decimal('0'))
+                notas_por_aluno[nota.aluno_id] += nota.nota
+            total_valor = sum((avaliacao.valor_maximo for avaliacao in avaliacoes), Decimal('0'))
+            alunos_abaixo_media += sum(
+                1 for valor in notas_por_aluno.values()
+                if (_media_periodo(valor, total_valor, disciplina.nota_total) or Decimal('0')) < disciplina.media_aprovacao
+            )
+            alunos_baixa_frequencia += sum(
+                1 for dados in resumo.values()
+                if dados.get('percentual') is not None and dados['percentual'] < Decimal('75.00')
+            )
 
     context = {
         'total_turmas': turmas.count(),
         'total_disciplinas': disciplinas.count(),
         'total_conteudos': conteudos.count(),
+        'atividades_pendentes': atividades.filter(status__in=['A_REALIZAR', 'EM_ANDAMENTO']).count(),
+        'atividades_corrigidas': atividades.filter(status__in=['CORRIGIDA', 'FINALIZADA']).count(),
+        'total_aulas_dadas': aulas_dadas,
+        'alunos_abaixo_media': alunos_abaixo_media,
+        'alunos_baixa_frequencia': alunos_baixa_frequencia,
         'alertas_nao_lidos': alertas.filter(lido=False).count(),
         'alertas_gerais': alertas_gerais_usuario(request.user, limite=None),
         'turmas': turmas,
@@ -265,6 +393,7 @@ def turma_detalhes(request, id):
     anotacoes = turma.anotacoes.filter(professor=request.user)
     processos = turma.processos_avaliativos.select_related('disciplina')
     chamadas = turma.chamadas.select_related('disciplina')
+    risco = _resumo_risco_turma(turma, disciplinas)
     context = {
         'turma': turma,
         'disciplinas': disciplinas[:6],
@@ -280,6 +409,7 @@ def turma_detalhes(request, id):
         'total_alunos': turma.alunos.count(),
         'total_avaliacoes': processos.count(),
         'total_presencas': chamadas.count(),
+        **risco,
     }
     return render(request, 'turmas/detalhes.html', context)
 
@@ -329,7 +459,18 @@ def disciplina_lista(request):
 @login_required
 def disciplina_detalhes(request, id):
     disciplina = get_object_or_404(Disciplina.objects.filter(professor=request.user).select_related('turma'), id=id)
-    return render(request, 'disciplinas/detalhes.html', {'disciplina': disciplina, 'turma': disciplina.turma})
+    avaliacoes = disciplina.processos_avaliativos.select_related('turma', 'disciplina').prefetch_related('arquivos')
+    grupos_planejamento = _grupos_planejamento(avaliacoes)
+    return render(
+        request,
+        'disciplinas/detalhes.html',
+        {
+            'disciplina': disciplina,
+            'turma': disciplina.turma,
+            'grupos_planejamento': grupos_planejamento,
+            'avaliacoes': avaliacoes,
+        },
+    )
 
 
 @login_required
@@ -484,7 +625,150 @@ def conteudo_concluir(request, id):
 
 @login_required
 def relatorio_lista(request):
-    return render(request, 'relatorios/lista.html')
+    turmas = Turma.objects.filter(professor=request.user)
+    disciplinas = Disciplina.objects.filter(professor=request.user).select_related('turma')
+    return render(request, 'relatorios/lista.html', {'turmas': turmas, 'disciplinas': disciplinas})
+
+
+def _render_relatorio_pdf(titulo, cabecalhos, linhas, nome_arquivo):
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    except ImportError:
+        response = HttpResponse(_pdf_simples(titulo, cabecalhos, linhas), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}.pdf"'
+        return response
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="{nome_arquivo}.pdf"'
+    doc = SimpleDocTemplate(response, pagesize=landscape(A4), leftMargin=24, rightMargin=24, topMargin=24, bottomMargin=24)
+    styles = getSampleStyleSheet()
+    data = [cabecalhos] + linhas
+    tabela = Table(data, repeatRows=1)
+    tabela.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f4f7a')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#d0d7de')),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ]))
+    doc.build([Paragraph(titulo, styles['Title']), Spacer(1, 12), tabela])
+    return response
+
+
+def _pdf_escape(texto):
+    return str(texto).replace('\\', '\\\\').replace('(', '\\(').replace(')', '\\)')
+
+
+def _pdf_simples(titulo, cabecalhos, linhas):
+    largura, altura = 842, 595
+    y = 560
+    comandos = ['BT', '/F1 14 Tf', f'40 {y} Td', f'({_pdf_escape(titulo)}) Tj']
+    y -= 26
+    comandos.extend(['/F1 8 Tf', f'0 -26 Td', f'({_pdf_escape(" | ".join(cabecalhos))}) Tj'])
+    y -= 14
+    for linha in linhas[:34]:
+        texto = ' | '.join(str(valor) for valor in linha)
+        if len(texto) > 170:
+            texto = texto[:167] + '...'
+        comandos.extend([f'0 -14 Td', f'({_pdf_escape(texto)}) Tj'])
+    comandos.append('ET')
+    stream = '\n'.join(comandos).encode('latin-1', errors='replace')
+    objetos = [
+        b'<< /Type /Catalog /Pages 2 0 R >>',
+        b'<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        f'<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {largura} {altura}] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>'.encode(),
+        b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+        b'<< /Length ' + str(len(stream)).encode() + b' >>\nstream\n' + stream + b'\nendstream',
+    ]
+    pdf = bytearray(b'%PDF-1.4\n')
+    offsets = [0]
+    for indice, objeto in enumerate(objetos, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f'{indice} 0 obj\n'.encode())
+        pdf.extend(objeto)
+        pdf.extend(b'\nendobj\n')
+    xref = len(pdf)
+    pdf.extend(f'xref\n0 {len(objetos) + 1}\n0000000000 65535 f \n'.encode())
+    for offset in offsets[1:]:
+        pdf.extend(f'{offset:010d} 00000 n \n'.encode())
+    pdf.extend(f'trailer << /Size {len(objetos) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF'.encode())
+    return bytes(pdf)
+
+
+@login_required
+def exportar_notas_pdf(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    alunos = list(turma.alunos.filter(ativo=True))
+    avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina).select_related('disciplina'))
+    notas = {
+        (nota.aluno_id, nota.processo_id): nota.nota
+        for nota in NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes)
+    }
+    cabecalhos = ['Aluno'] + [avaliacao.titulo for avaliacao in avaliacoes] + ['Media/Soma']
+    linhas = []
+    for aluno in alunos:
+        valores = [notas.get((aluno.id, avaliacao.id)) for avaliacao in avaliacoes]
+        media = sum([valor for valor in valores if valor is not None], Decimal('0')) if valores else None
+        linhas.append([aluno.nome] + [str(valor or '-') for valor in valores] + [str(media if media is not None else '-')])
+    return _render_relatorio_pdf(f'Notas - {turma.nome} - {disciplina.nome}', cabecalhos, linhas, 'notas')
+
+
+@login_required
+def exportar_frequencia_pdf(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    alunos = list(turma.alunos.filter(ativo=True))
+    _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
+    cabecalhos = ['Aluno', 'Aulas', 'Faltas', 'Presencas', 'Frequencia', 'Situacao']
+    linhas = []
+    for aluno in alunos:
+        dados = resumo.get(aluno.id, {})
+        percentual = dados.get('percentual')
+        situacao = 'Baixa frequencia' if percentual is not None and percentual < Decimal('75.00') else 'Regular'
+        linhas.append([
+            aluno.nome,
+            str(dados.get('total_aulas', 0)),
+            str(dados.get('faltas', 0)),
+            str(dados.get('presencas', 0)),
+            f'{percentual}%' if percentual is not None else '-',
+            situacao,
+        ])
+    return _render_relatorio_pdf(f'Frequencia - {turma.nome} - {disciplina.nome}', cabecalhos, linhas, 'frequencia')
+
+
+@login_required
+def relatorio_final(request, turma_id):
+    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+    disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    alunos = list(turma.alunos.filter(ativo=True))
+    avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
+    notas = NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes)
+    notas_por_aluno = {}
+    for nota in notas:
+        notas_por_aluno.setdefault(nota.aluno_id, Decimal('0'))
+        notas_por_aluno[nota.aluno_id] += nota.nota
+    total_valor = sum((avaliacao.valor_maximo for avaliacao in avaliacoes), Decimal('0'))
+    _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
+    cabecalhos = ['Aluno', 'Media final', 'Frequencia', 'Faltas', 'Situacao']
+    linhas = []
+    for aluno in alunos:
+        media = _media_periodo(notas_por_aluno.get(aluno.id), total_valor, disciplina.nota_total)
+        frequencia = resumo.get(aluno.id, {}).get('percentual')
+        aulas_concluidas = disciplina.quantidade_aulas > 0 and disciplina.aulas_dadas >= disciplina.quantidade_aulas
+        situacao, _ = _situacao_academica(media, frequencia, disciplina.media_aprovacao, aulas_concluidas)
+        linhas.append([
+            aluno.nome,
+            str(media if media is not None else '-'),
+            f'{frequencia}%' if frequencia is not None else '-',
+            str(resumo.get(aluno.id, {}).get('faltas', 0)),
+            situacao.upper() if situacao == 'Aprovado' else situacao,
+        ])
+    return _render_relatorio_pdf(f'Relatorio final - {turma.nome} - {disciplina.nome}', cabecalhos, linhas, 'relatorio_final')
 
 
 @login_required
@@ -525,6 +809,9 @@ def alerta_excluir(request, id):
 def aluno_lista(request, turma_id):
     turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
     alunos = turma.alunos.all()
+    busca = (request.GET.get('q') or '').strip()
+    if busca:
+        alunos = alunos.filter(Q(nome__icontains=busca) | Q(matricula__icontains=busca))
     return render(request, 'alunos/lista.html', {'turma': turma, 'alunos': alunos})
 
 
@@ -547,7 +834,8 @@ def aluno_detalhes(request, turma_id, id):
     turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
     aluno = get_object_or_404(Aluno.objects.filter(turma=turma), id=id)
     notas = aluno.notas.select_related('processo', 'processo__disciplina')
-    return render(request, 'alunos/detalhes.html', {'turma': turma, 'aluno': aluno, 'notas': notas})
+    recuperacoes = aluno.recuperacoes.select_related('disciplina')
+    return render(request, 'alunos/detalhes.html', {'turma': turma, 'aluno': aluno, 'notas': notas, 'recuperacoes': recuperacoes})
 
 
 @login_required
@@ -578,18 +866,21 @@ def aluno_deletar(request, turma_id, id):
 @login_required
 def avaliacao_lista(request, turma_id):
     turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
-    avaliacoes = turma.processos_avaliativos.select_related('disciplina')
-    return render(request, 'avaliacoes/lista.html', {'turma': turma, 'avaliacoes': avaliacoes})
+    avaliacoes = turma.processos_avaliativos.select_related('disciplina').prefetch_related('arquivos')
+    grupos_planejamento = _grupos_planejamento(avaliacoes)
+    return render(request, 'avaliacoes/lista.html', {'turma': turma, 'avaliacoes': avaliacoes, 'grupos_planejamento': grupos_planejamento})
 
 
 @login_required
 def avaliacao_criar(request, turma_id):
     turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
-    form = ProcessoAvaliativoForm(request.POST or None, turma=turma)
+    form = ProcessoAvaliativoForm(request.POST or None, request.FILES or None, turma=turma)
     if request.method == 'POST' and form.is_valid():
         avaliacao = form.save(commit=False)
         avaliacao.turma = turma
         avaliacao.save()
+        for arquivo in form.cleaned_data.get('anexos') or []:
+            Arquivo.objects.create(atividade=avaliacao, arquivo=arquivo)
         messages.success(request, 'Avaliacao cadastrada com sucesso.')
         return redirect('avaliacao_detalhes', turma_id=turma.id, id=avaliacao.id)
 
@@ -611,7 +902,7 @@ def avaliacao_detalhes(request, turma_id, id):
 def avaliacao_editar(request, turma_id, id):
     turma = get_object_or_404(Turma.objects.filter(professor=request.user), id=turma_id)
     avaliacao = get_object_or_404(ProcessoAvaliativo.objects.filter(turma=turma), id=id)
-    form = ProcessoAvaliativoForm(request.POST or None, instance=avaliacao, turma=turma)
+    form = ProcessoAvaliativoForm(request.POST or None, request.FILES or None, instance=avaliacao, turma=turma)
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, 'Avaliacao atualizada com sucesso.')
@@ -697,6 +988,10 @@ def planilha_turma(request, turma_id):
         if disciplina else turma.processos_avaliativos.none()
     )
     aulas, resumo_presencas = _resumo_presencas_aulas(turma, disciplina, alunos)
+    recuperacoes = {
+        (recuperacao.aluno_id, recuperacao.periodo): recuperacao
+        for recuperacao in Recuperacao.objects.filter(aluno__in=alunos, disciplina=disciplina)
+    } if disciplina else {}
     aulas_previstas = disciplina.quantidade_aulas if disciplina else 0
     media_aprovacao = disciplina.media_aprovacao if disciplina else Decimal('6.00')
     total_aulas = sum(aula.quantidade_aulas for aula in aulas)
@@ -739,6 +1034,37 @@ def planilha_turma(request, turma_id):
                     else:
                         nota_aluno.save()
 
+            if disciplina:
+                for tipo_periodo, periodo in {
+                    (_tipo_periodo_registro(avaliacao), _periodo_registro(avaliacao))
+                    for avaliacao in avaliacoes
+                } or {(disciplina.tipo_periodo, 'ANUAL')}:
+                    rec_valor = (request.POST.get(f'recuperacao_{aluno.id}_{periodo}') or '').strip().replace(',', '.')
+                    par_valor = (request.POST.get(f'paralela_{aluno.id}_{periodo}') or '').strip().replace(',', '.')
+                    rec_obj = Recuperacao.objects.filter(aluno=aluno, disciplina=disciplina, periodo=periodo).first()
+                    if not rec_valor and not par_valor:
+                        if rec_obj:
+                            rec_obj.delete()
+                        continue
+                    rec_obj = rec_obj or Recuperacao(aluno=aluno, disciplina=disciplina, periodo=periodo)
+                    try:
+                        rec_obj.nota_recuperacao = Decimal(rec_valor) if rec_valor else None
+                        rec_obj.nota_paralela = Decimal(par_valor) if par_valor else None
+                    except InvalidOperation:
+                        messages.error(request, f'Nota de recuperacao/paralela invalida para {aluno.nome}.')
+                        houve_erro = True
+                        continue
+                    try:
+                        rec_obj.full_clean()
+                    except ValidationError as erro:
+                        mensagens = []
+                        for erros_campo in erro.message_dict.values():
+                            mensagens.extend(erros_campo)
+                        messages.error(request, f'{aluno.nome}: {" ".join(mensagens)}')
+                        houve_erro = True
+                    else:
+                        rec_obj.save()
+
             try:
                 registro.full_clean()
             except ValidationError as erro:
@@ -764,7 +1090,10 @@ def planilha_turma(request, turma_id):
     chaves_periodo = {
         (_tipo_periodo_registro(avaliacao), _periodo_registro(avaliacao))
         for avaliacao in avaliacoes
-    } or {('ANUAL', 'ANUAL')}
+    }
+    if not chaves_periodo and disciplina:
+        chaves_periodo = {(disciplina.tipo_periodo, codigo) for codigo, _ in disciplina.periodos_disponiveis()}
+    chaves_periodo = chaves_periodo or {('ANUAL', 'ANUAL')}
 
     grupos = []
     medias_grafico = {}
@@ -780,6 +1109,7 @@ def planilha_turma(request, turma_id):
             avaliacao for avaliacao in avaliacoes
             if (_tipo_periodo_registro(avaliacao), _periodo_registro(avaliacao)) == (grupo_tipo, grupo_periodo)
         ]
+        total_valor_grupo = sum((avaliacao.valor_maximo for avaliacao in avaliacoes_grupo), Decimal('0'))
         linhas = []
         for aluno in alunos:
             registro = registros.get(aluno.id) or RegistroAlunoTurma(
@@ -796,43 +1126,38 @@ def planilha_turma(request, turma_id):
                 nota = notas.get((aluno.id, avaliacao.id))
                 if nota:
                     notas_media.append(nota.nota)
-                    medias_grafico.setdefault(aluno.id, []).append(nota.nota)
                 cells.append({'avaliacao': avaliacao, 'nota': nota})
 
             presenca_dados = resumo_presencas.get(aluno.id, {'total_aulas': 0, 'presencas': 0, 'faltas': 0, 'percentual': None})
             soma_notas = sum(notas_media, Decimal('0')) if notas_media else None
+            recuperacao = recuperacoes.get((aluno.id, grupo_periodo))
+            media_periodo = _media_periodo(soma_notas, total_valor_grupo, disciplina.nota_total if disciplina else Decimal('10.00'))
+            media_final = _media_com_recuperacao(media_periodo, recuperacao, disciplina.nota_total if disciplina else Decimal('10.00'))
+            if media_final is not None:
+                medias_grafico.setdefault(aluno.id, []).append(media_final)
             frequencia = presenca_dados.get('percentual')
             aulas_concluidas = aulas_previstas > 0 and total_aulas >= aulas_previstas
-            media_final = soma_notas if soma_notas is not None else Decimal('0')
-            if not aulas_concluidas:
-                situacao = 'Em andamento'
-                badge = 'text-bg-secondary'
-            elif frequencia is not None and frequencia < Decimal('75.00') and media_final < media_aprovacao:
-                situacao = 'Reprovado por nota e falta'
-                badge = 'text-bg-danger'
-            elif frequencia is not None and frequencia < Decimal('75.00'):
-                situacao = 'Reprovado por falta'
-                badge = 'text-bg-danger'
-            elif media_final < media_aprovacao:
-                situacao = 'Recuperação/Paralela'
-                badge = 'text-bg-warning'
-            else:
-                situacao = 'Aprovado'
-                badge = 'text-bg-success'
+            situacao, badge = _situacao_academica(media_final, frequencia, media_aprovacao, aulas_concluidas)
             linhas.append({
                 'aluno': aluno,
                 'registro': registro,
                 'presenca': presenca_dados,
                 'notas': cells,
-                'media': soma_notas,
+                'soma': soma_notas,
+                'media': media_periodo,
+                'recuperacao': recuperacao,
+                'media_final': media_final,
                 'situacao': situacao,
                 'badge': badge,
             })
 
         grupos.append({
             'titulo': _titulo_periodo(grupo_tipo, grupo_periodo),
+            'tipo_periodo': grupo_tipo,
+            'periodo': grupo_periodo,
             'badge': PERIODO_BADGES.get(grupo_tipo, 'text-bg-secondary'),
             'avaliacoes': avaliacoes_grupo,
+            'total_valor': total_valor_grupo,
             'linhas': linhas,
         })
 
@@ -840,8 +1165,8 @@ def planilha_turma(request, turma_id):
     for aluno in alunos:
         notas_aluno = medias_grafico.get(aluno.id, [])
         if notas_aluno:
-            soma_aluno = sum(notas_aluno, Decimal('0')).quantize(Decimal('0.01'))
-            medias_alunos.append({'aluno': aluno.nome, 'media': float(soma_aluno)})
+            media_aluno = (sum(notas_aluno, Decimal('0')) / len(notas_aluno)).quantize(Decimal('0.01'))
+            medias_alunos.append({'aluno': aluno.nome, 'media': float(media_aluno)})
     media_geral = None
     if medias_alunos:
         media_geral = (sum(Decimal(str(item['media'])) for item in medias_alunos) / len(medias_alunos)).quantize(Decimal('0.01'))
@@ -904,6 +1229,8 @@ def chamada_turma(request, turma_id):
     alunos = list(turma.alunos.filter(ativo=True))
     aulas = list(turma.aulas.filter(disciplina=disciplina).order_by('data', 'id')) if disciplina else []
     total_aulas = sum(aula.quantidade_aulas for aula in aulas)
+    aulas_previstas = disciplina.quantidade_aulas if disciplina else 0
+    aulas_restantes = max(aulas_previstas - total_aulas, 0)
     presencas = {
         (presenca.aluno_id, presenca.aula_id): presenca
         for presenca in Presenca.objects.filter(aula__in=aulas, aluno__in=alunos)
@@ -921,11 +1248,13 @@ def chamada_turma(request, turma_id):
             else:
                 faltas += aula.quantidade_aulas
             cells.append({'aula': aula, 'presenca': presenca, 'presente': presente})
+        percentual = _percentual_presenca(presencas_total, total_aulas)
         linhas.append({
             'aluno': aluno,
             'presencas': cells,
             'faltas': faltas,
-            'percentual': _percentual_presenca(presencas_total, total_aulas),
+            'percentual': percentual,
+            'situacao_frequencia': 'Baixa frequencia' if percentual is not None and percentual < Decimal('75.00') else 'Regular',
         })
 
     return render(request, 'turmas/chamada.html', {
@@ -936,6 +1265,9 @@ def chamada_turma(request, turma_id):
             for item in disciplinas
         ],
         'aulas': aulas,
+        'total_aulas': total_aulas,
+        'aulas_previstas': aulas_previstas,
+        'aulas_restantes': aulas_restantes,
         'linhas': linhas,
     })
 
@@ -943,7 +1275,7 @@ def chamada_turma(request, turma_id):
 @login_required
 def registrar_aula(request, turma_id):
     turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
-    form = AulaForm(request.POST or None, turma=turma)
+    form = AulaForm(request.POST or None, request.FILES or None, turma=turma)
     linhas = _linhas_presenca_aula(turma)
     if request.method == 'POST' and form.is_valid():
         aula = form.save(commit=False)
@@ -956,6 +1288,8 @@ def registrar_aula(request, turma_id):
                     messages.error(request, mensagem)
         else:
             aula.save()
+            for arquivo in form.cleaned_data.get('anexos') or []:
+                Arquivo.objects.create(aula=aula, arquivo=arquivo)
             if _salvar_presencas_aula(request, turma, aula):
                 messages.success(request, 'Aula registrada com sucesso.')
                 return redirect(f'/turmas/{turma.id}/chamada/?disciplina={aula.disciplina_id}')
@@ -966,7 +1300,7 @@ def registrar_aula(request, turma_id):
 def editar_chamada(request, turma_id, aula_id):
     turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
     aula = get_object_or_404(Aula.objects.filter(turma=turma), id=aula_id)
-    form = AulaForm(request.POST or None, instance=aula, turma=turma)
+    form = AulaForm(request.POST or None, request.FILES or None, instance=aula, turma=turma)
     if request.method == 'POST' and form.is_valid():
         aula = form.save(commit=False)
         aula.turma = turma
@@ -978,6 +1312,8 @@ def editar_chamada(request, turma_id, aula_id):
                     messages.error(request, mensagem)
         else:
             aula.save()
+            for arquivo in form.cleaned_data.get('anexos') or []:
+                Arquivo.objects.create(aula=aula, arquivo=arquivo)
             if _salvar_presencas_aula(request, turma, aula):
                 messages.success(request, 'Chamada atualizada com sucesso.')
                 return redirect(f'/turmas/{turma.id}/chamada/?disciplina={aula.disciplina_id}')

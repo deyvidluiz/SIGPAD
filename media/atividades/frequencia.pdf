@@ -1,0 +1,50 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 521 >>
+stream
+BT
+/F1 14 Tf
+40 560 Td
+(Frequencia - 3AII - Matematica) Tj
+/F1 8 Tf
+0 -26 Td
+(Aluno | Aulas | Faltas | Presencas | Frequencia | Situacao) Tj
+0 -14 Td
+(Grando leandro | 160 | 80 | 80 | 50.00% | Baixa frequencia) Tj
+0 -14 Td
+(Mosca-branca | 160 | 0 | 160 | 100.00% | Regular) Tj
+0 -14 Td
+(URubuzao do pix | 160 | 0 | 160 | 100.00% | Regular) Tj
+0 -14 Td
+(deyvid | 160 | 42 | 118 | 73.75% | Baixa frequencia) Tj
+0 -14 Td
+(eu | 160 | 0 | 160 | 100.00% | Regular) Tj
+0 -14 Td
+(marcos | 160 | 20 | 140 | 87.50% | Regular) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer << /Size 6 /Root 1 0 R >>
+startxref
+883
+%%EOF

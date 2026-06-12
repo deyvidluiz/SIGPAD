@@ -1,53 +1,84 @@
 {% extends 'base.html' %}
 
-{% block title %}Avaliacoes | SIGPAD{% endblock %}
-{% block page_title %}Avaliacoes - {{ turma.nome }}{% endblock %}
+{% block title %}Planejamento e Avaliacoes | SIGPAD{% endblock %}
+{% block page_title %}Planejamento e avaliacoes - {{ turma.nome }}{% endblock %}
+{% block page_subtitle %}Atividades agrupadas por periodo, como na planilha escolar base.{% endblock %}
+
+{% block heading_actions %}
+<a href="{% url 'avaliacao_criar' turma.id %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i>Nova atividade</a>
+<a href="{% url 'planilha_turma' turma.id %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-grid-3x3-gap"></i>Planilha de notas</a>
+{% endblock %}
 
 {% block turma_subnav %}
 {% include 'turmas/_submenu.html' %}
 {% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2 class="h5 mb-0">Processos avaliativos</h2>
-    <a href="{% url 'avaliacao_criar' turma.id %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Nova avaliacao</a>
-</div>
-
-<div class="card border-0 shadow-sm">
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th>Titulo</th>
-                    <th>Disciplina</th>
-                    <th>Tipo</th>
-                    <th>Valor maximo</th>
-                    <th>Data</th>
-                    <th class="text-end">Acoes</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for avaliacao in avaliacoes %}
-                    <tr>
-                        <td>{{ avaliacao.titulo }}</td>
-                        <td>{{ avaliacao.disciplina.nome }}</td>
-                        <td><span class="badge text-bg-primary">{{ avaliacao.get_tipo_display }}</span></td>
-                        <td>{{ avaliacao.valor_maximo }}</td>
-                        <td>{{ avaliacao.data|date:'d/m/Y'|default:'-' }}</td>
-                        <td class="text-end">
-                            <a href="{% url 'avaliacao_detalhes' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
-                            <a href="{% url 'planilha_turma' turma.id %}?disciplina={{ avaliacao.disciplina.id }}&tipo_periodo={{ avaliacao.tipo_periodo|default:'ANUAL' }}&periodo={{ avaliacao.periodo|default:'ANUAL' }}" class="btn btn-sm btn-outline-success">Editar notas</a>
-                            <a href="{% url 'avaliacao_editar' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
-                            <a href="{% url 'avaliacao_deletar' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-danger">Excluir</a>
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center text-muted py-4">Nenhuma avaliacao cadastrada.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title"><i class="bi bi-journal-text"></i><span>Planejamento da Disciplina</span></h2>
+            <p class="text-muted mb-0">Periodo, atividade, tipo livre, valor, prazos, conteudo, status e arquivos.</p>
+        </div>
     </div>
-</div>
+
+    {% for grupo in grupos_planejamento %}
+        <div class="period-block mb-4">
+            <div class="period-title">
+                <span class="badge {{ grupo.badge }}">{{ grupo.titulo }}</span>
+            </div>
+            <div class="table-responsive spreadsheet-scroll">
+                <table class="table table-bordered table-hover align-middle mb-0 spreadsheet-table">
+                    <thead>
+                        <tr>
+                            <th>Periodo</th>
+                            <th>Atividade</th>
+                            <th>Disciplina</th>
+                            <th>Tipo</th>
+                            <th>Valor</th>
+                            <th>Abertura</th>
+                            <th>Fechamento</th>
+                            <th>Conteudo</th>
+                            <th>Status</th>
+                            <th>Arquivo</th>
+                            <th class="text-end">Acoes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for avaliacao in grupo.atividades %}
+                            <tr>
+                                <td>{{ avaliacao.get_periodo_planejamento_display }}</td>
+                                <td class="fw-semibold">{{ avaliacao.titulo }}</td>
+                                <td>{{ avaliacao.disciplina.nome }}</td>
+                                <td>{{ avaliacao.tipo }}</td>
+                                <td>{{ avaliacao.valor_maximo }}</td>
+                                <td>{{ avaliacao.data_abertura|date:'d/m/Y'|default:'-' }}</td>
+                                <td>{{ avaliacao.data_fechamento|date:'d/m/Y'|default:'-' }}</td>
+                                <td>{{ avaliacao.descricao|default:'-'|truncatechars:80 }}</td>
+                                <td><span class="badge text-bg-secondary">{{ avaliacao.get_status_display }}</span></td>
+                                <td>
+                                    {% if avaliacao.arquivo %}
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ avaliacao.arquivo.url }}" download>Baixar</a>
+                                    {% endif %}
+                                    {% for arquivo in avaliacao.arquivos.all %}
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ arquivo.arquivo.url }}" download>{{ arquivo.nome|truncatechars:18 }}</a>
+                                    {% empty %}
+                                        {% if not avaliacao.arquivo %}<span class="text-muted">-</span>{% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{% url 'avaliacao_detalhes' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-primary">Detalhes</a>
+                                    <a href="{% url 'planilha_turma' turma.id %}?disciplina={{ avaliacao.disciplina.id }}" class="btn btn-sm btn-outline-success">Notas</a>
+                                    <a href="{% url 'avaliacao_editar' turma.id avaliacao.id %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% empty %}
+        <div class="text-center text-muted py-4">Nenhuma atividade cadastrada.</div>
+    {% endfor %}
+</section>
 {% endblock %}

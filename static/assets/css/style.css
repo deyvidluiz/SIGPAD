@@ -1684,6 +1684,16 @@ html[data-theme="dark"] {
   text-align: center;
 }
 
+.period-title {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--admin-border);
+  font-weight: 800;
+}
+
 .sticky-save-bar {
   position: sticky;
   bottom: 0;
@@ -1772,4 +1782,41 @@ html[data-theme="dark"] {
 [data-theme="dark"] .btn-outline-secondary {
   color: #e5e7eb;
   border-color: #64748b;
+}
+
+[data-theme="dark"] .table-bordered > :not(caption) > * {
+  border-color: #374151 !important;
+}
+
+[data-theme="dark"] .table input,
+[data-theme="dark"] .table select,
+[data-theme="dark"] .table textarea {
+  background-color: #0b1120 !important;
+  color: #f9fafb !important;
+}
+
+[data-theme="dark"] .metric-card,
+[data-theme="dark"] .mini-card,
+[data-theme="dark"] .info-list div,
+[data-theme="dark"] .settings-row,
+[data-theme="dark"] .legend-list div {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+  border-color: #374151 !important;
+}
+
+[data-theme="dark"] .metric-icon {
+  background-color: #1e3a5f !important;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .card-header.bg-white,
+[data-theme="dark"] .sticky-col.bg-white {
+  background-color: #111827 !important;
+  color: #f9fafb !important;
+}
+
+[data-theme="dark"] option {
+  background-color: #0f172a;
+  color: #f9fafb;
 }

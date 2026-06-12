@@ -2,8 +2,8 @@
 {% load l10n %}
 
 {% block title %}Planilha da Turma | SIGPAD{% endblock %}
-{% block page_title %}Planilha da turma - {{ turma.nome }}{% endblock %}
-{% block page_subtitle %}Notas por avaliacao, frequencia por disciplina e media da turma.{% endblock %}
+{% block page_title %}Avaliacoes e notas - {{ turma.nome }}{% endblock %}
+{% block page_subtitle %}Planilha estilo Excel com soma, media, frequencia e situacao automatica por periodo.{% endblock %}
 
 {% block turma_subnav %}
 {% include 'turmas/_submenu.html' %}
@@ -31,6 +31,13 @@
                 <button class="btn btn-outline-primary" type="submit">Filtrar</button>
             </div>
         </form>
+        {% if disciplina %}
+            <div class="d-flex flex-wrap gap-2 mt-3">
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'exportar_notas_pdf' turma.id %}?disciplina={{ disciplina.id }}"><i class="bi bi-file-earmark-pdf me-1"></i>Exportar notas</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'exportar_frequencia_pdf' turma.id %}?disciplina={{ disciplina.id }}"><i class="bi bi-file-earmark-pdf me-1"></i>Exportar frequencia</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{% url 'relatorio_final' turma.id %}?disciplina={{ disciplina.id }}"><i class="bi bi-clipboard-data me-1"></i>Relatorio final</a>
+            </div>
+        {% endif %}
     </div>
 </section>
 
@@ -43,7 +50,7 @@
                 <span class="badge {{ grupo.badge }}">{{ grupo.titulo }}</span>
                 <strong>{{ grupo.titulo }}</strong>
             </div>
-                <span class="text-muted small">{{ grupo.avaliacoes|length }} avaliacao{{ grupo.avaliacoes|length|pluralize }} | {{ total_aulas }} registrada{{ total_aulas|pluralize }} | {{ aulas_restantes }} restante{{ aulas_restantes|pluralize }}</span>
+                <span class="text-muted small">{{ grupo.avaliacoes|length }} avaliacao{{ grupo.avaliacoes|length|pluralize }} | {{ grupo.total_valor }} pts planejados | {{ total_aulas }} aula{{ total_aulas|pluralize }} registrada{{ total_aulas|pluralize }}</span>
             </div>
 
             <div class="table-responsive spreadsheet-scroll">
@@ -63,7 +70,11 @@
                             {% empty %}
                                 <th class="text-center nota-col">Avaliacoes</th>
                             {% endfor %}
-                            <th class="text-center numeric-col">Media/Soma</th>
+                            <th class="text-center numeric-col">Soma</th>
+                            <th class="text-center numeric-col">Media</th>
+                            <th class="text-center nota-col">Recuperacao</th>
+                            <th class="text-center nota-col">Paralela</th>
+                            <th class="text-center numeric-col">Media final</th>
                             <th class="text-center situation-col">Situacao</th>
                             <th class="text-center actions-col">Acoes</th>
                         </tr>
@@ -86,7 +97,15 @@
                                 {% empty %}
                                     <td class="text-center text-muted">Cadastre avaliacoes</td>
                                 {% endfor %}
+                                <td class="text-center fw-semibold">{% if linha.soma is not None %}{{ linha.soma }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
                                 <td class="text-center fw-semibold">{% if linha.media is not None %}{{ linha.media }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
+                                <td>
+                                    <input class="form-control form-control-sm spreadsheet-input" type="number" step="0.01" min="0" name="recuperacao_{{ linha.aluno.id }}_{{ grupo.periodo|default:'ANUAL' }}" value="{% if linha.recuperacao and linha.recuperacao.nota_recuperacao is not None %}{{ linha.recuperacao.nota_recuperacao|unlocalize }}{% endif %}">
+                                </td>
+                                <td>
+                                    <input class="form-control form-control-sm spreadsheet-input" type="number" step="0.01" min="0" name="paralela_{{ linha.aluno.id }}_{{ grupo.periodo|default:'ANUAL' }}" value="{% if linha.recuperacao and linha.recuperacao.nota_paralela is not None %}{{ linha.recuperacao.nota_paralela|unlocalize }}{% endif %}">
+                                </td>
+                                <td class="text-center fw-semibold">{% if linha.media_final is not None %}{{ linha.media_final }}{% else %}<span class="text-muted">-</span>{% endif %}</td>
                                 <td class="text-center"><span class="badge {{ linha.badge }}">{{ linha.situacao }}</span></td>
                                 <td class="text-center">
                                     <a class="btn btn-sm btn-outline-primary" href="{% url 'aluno_detalhes' turma.id linha.aluno.id %}">Aluno</a>
@@ -126,7 +145,7 @@
     </div>
     <div class="col-12 col-xl-9">
         <div class="card border-0 shadow-sm">
-            <div class="card-header bg-white fw-semibold">Media dos alunos da turma</div>
+            <div class="card-header bg-white fw-semibold">Grafico da turma</div>
             <div class="card-body">
                 <div style="height: 320px;">
                     <canvas id="graficoMedias"></canvas>
@@ -145,6 +164,9 @@
     if (!canvas || !window.Chart) return;
     var labels = JSON.parse(document.getElementById("chart-labels").textContent);
     var medias = JSON.parse(document.getElementById("chart-medias").textContent);
+    var dark = document.documentElement.getAttribute("data-theme") === "dark";
+    var textColor = dark ? "#e5edf7" : "#1f2937";
+    var gridColor = dark ? "#2f3b52" : "#dbe4ef";
     new Chart(canvas, {
       type: "bar",
       data: {
@@ -152,10 +174,10 @@
         datasets: [{
           label: "Media",
           data: medias,
-          backgroundColor: "#2563eb",
-          borderRadius: 6,
-          barThickness: 18,
-          maxBarThickness: 22
+          backgroundColor: dark ? "#60a5fa" : "#2563eb",
+          borderRadius: 5,
+          barThickness: 14,
+          maxBarThickness: 18
         }]
       },
       options: {
@@ -163,10 +185,11 @@
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          title: { display: true, text: "Media dos alunos da turma" }
+          title: { display: true, text: "Media dos alunos da turma", color: textColor }
         },
         scales: {
-          y: { beginAtZero: true, max: 10 }
+          x: { ticks: { color: textColor, maxRotation: 45, minRotation: 0 }, grid: { color: gridColor } },
+          y: { beginAtZero: true, max: 10, ticks: { color: textColor }, grid: { color: gridColor } }
         }
       }
     });

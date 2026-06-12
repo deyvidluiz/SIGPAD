@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+    <meta charset="utf-8">
+    <title>{{ titulo }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; color: #111827; margin: 24px; }
+        h1 { font-size: 22px; margin-bottom: 16px; }
+        table { border-collapse: collapse; width: 100%; font-size: 12px; }
+        th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; }
+        th { background: #1f4f7a; color: #fff; }
+        @media print { button { display: none; } body { margin: 0; } }
+    </style>
+</head>
+<body>
+    <button onclick="window.print()">Imprimir / salvar em PDF</button>
+    <h1>{{ titulo }}</h1>
+    <table>
+        <thead>
+            <tr>
+                {% for cabecalho in cabecalhos %}
+                    <th>{{ cabecalho }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for linha in linhas %}
+                <tr>
+                    {% for valor in linha %}
+                        <td>{{ valor }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
