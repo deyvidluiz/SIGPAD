@@ -1,12 +1,35 @@
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-4qz#g@rurq0$m)r604)8907(v($66s+(jl%m271%-i1qhm+2od'
 
-DEBUG = True
+def load_local_env(env_path):
+    if not env_path.exists():
+        return
 
-ALLOWED_HOSTS = []
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_local_env(BASE_DIR / '.env')
+
+SECRET_KEY = os.environ.get(
+    'DJANGO_SECRET_KEY',
+    'django-insecure-4qz#g@rurq0$m)r604)8907(v($66s+(jl%m271%-i1qhm+2od',
+)
+
+DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in {'1', 'true', 'yes', 'on'}
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',')
+    if host.strip()
+]
 
 
 INSTALLED_APPS = [
@@ -63,8 +86,16 @@ WSGI_APPLICATION = 'planejamento_pcc.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'planejamento_pcc'),
+        'USER': os.environ.get('POSTGRES_USER', 'planejamento_pcc'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'planejamento_pcc'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+        'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+        'OPTIONS': {
+            'connect_timeout': int(os.environ.get('POSTGRES_CONNECT_TIMEOUT', '10')),
+        },
     }
 }
 
