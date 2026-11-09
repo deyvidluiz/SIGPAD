@@ -211,6 +211,15 @@ def _situacao_academica(media, frequencia, media_aprovacao, aulas_concluidas=Tru
     return 'Aprovado', 'text-bg-success'
 
 
+def _valor_avaliacoes_lancadas(avaliacoes, notas):
+    """Soma o valor apenas das avaliacoes que ja possuem notas lancadas.
+
+    Evita que avaliacoes futuras (ainda sem notas) reduzam a media parcial.
+    """
+    lancadas = {nota.processo_id for nota in notas}
+    return sum((avaliacao.valor_maximo for avaliacao in avaliacoes if avaliacao.id in lancadas), Decimal('0'))
+
+
 def _media_periodo(soma_notas, total_valor, nota_total):
     if soma_notas is None:
         return None
@@ -265,9 +274,10 @@ def _resumo_risco_turma(turma, disciplinas):
         alunos = list(turma.alunos.filter(ativo=True))
         _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
         avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
-        total_valor = sum((avaliacao.valor_maximo for avaliacao in avaliacoes), Decimal('0'))
+        notas_lancadas = list(NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes))
+        total_valor = _valor_avaliacoes_lancadas(avaliacoes, notas_lancadas)
         notas_por_aluno = {}
-        for nota in NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes):
+        for nota in notas_lancadas:
             notas_por_aluno.setdefault(nota.aluno_id, Decimal('0'))
             notas_por_aluno[nota.aluno_id] += nota.nota
         total_aulas = disciplina.aulas_dadas
@@ -341,12 +351,12 @@ def dashboard(request):
             alunos = list(turma.alunos.filter(ativo=True))
             _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
             avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
-            notas = NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes)
+            notas = list(NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes))
             notas_por_aluno = {}
             for nota in notas:
                 notas_por_aluno.setdefault(nota.aluno_id, Decimal('0'))
                 notas_por_aluno[nota.aluno_id] += nota.nota
-            total_valor = sum((avaliacao.valor_maximo for avaliacao in avaliacoes), Decimal('0'))
+            total_valor = _valor_avaliacoes_lancadas(avaliacoes, notas)
             alunos_abaixo_media += sum(
                 1 for valor in notas_por_aluno.values()
                 if (_media_periodo(valor, total_valor, disciplina.nota_total) or Decimal('0')) < disciplina.media_aprovacao
@@ -747,12 +757,12 @@ def relatorio_final(request, turma_id):
     disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
     alunos = list(turma.alunos.filter(ativo=True))
     avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
-    notas = NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes)
+    notas = list(NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes))
     notas_por_aluno = {}
     for nota in notas:
         notas_por_aluno.setdefault(nota.aluno_id, Decimal('0'))
         notas_por_aluno[nota.aluno_id] += nota.nota
-    total_valor = sum((avaliacao.valor_maximo for avaliacao in avaliacoes), Decimal('0'))
+    total_valor = _valor_avaliacoes_lancadas(avaliacoes, notas)
     _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
     cabecalhos = ['Aluno', 'Media final', 'Frequencia', 'Faltas', 'Situacao']
     linhas = []
@@ -1110,6 +1120,7 @@ def planilha_turma(request, turma_id):
             if (_tipo_periodo_registro(avaliacao), _periodo_registro(avaliacao)) == (grupo_tipo, grupo_periodo)
         ]
         total_valor_grupo = sum((avaliacao.valor_maximo for avaliacao in avaliacoes_grupo), Decimal('0'))
+        total_lancado_grupo = _valor_avaliacoes_lancadas(avaliacoes_grupo, notas.values())
         linhas = []
         for aluno in alunos:
             registro = registros.get(aluno.id) or RegistroAlunoTurma(
@@ -1131,7 +1142,7 @@ def planilha_turma(request, turma_id):
             presenca_dados = resumo_presencas.get(aluno.id, {'total_aulas': 0, 'presencas': 0, 'faltas': 0, 'percentual': None})
             soma_notas = sum(notas_media, Decimal('0')) if notas_media else None
             recuperacao = recuperacoes.get((aluno.id, grupo_periodo))
-            media_periodo = _media_periodo(soma_notas, total_valor_grupo, disciplina.nota_total if disciplina else Decimal('10.00'))
+            media_periodo = _media_periodo(soma_notas, total_lancado_grupo, disciplina.nota_total if disciplina else Decimal('10.00'))
             media_final = _media_com_recuperacao(media_periodo, recuperacao, disciplina.nota_total if disciplina else Decimal('10.00'))
             if media_final is not None:
                 medias_grafico.setdefault(aluno.id, []).append(media_final)

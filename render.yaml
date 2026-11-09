@@ -1,0 +1,30 @@
+# Blueprint do Render para o SIGPAD.
+# Nenhuma credencial fica aqui: a SECRET_KEY e gerada pelo Render e a
+# DATABASE_URL vem do banco criado abaixo.
+services:
+  - type: web
+    name: sigpad
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn planejamento_pcc.wsgi:application --bind 0.0.0.0:$PORT
+    healthCheckPath: /login/
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sigpad-db
+          property: connectionString
+      - key: WEB_CONCURRENCY
+        value: "2"
+
+databases:
+  - name: sigpad-db
+    plan: free
+    databaseName: sigpad
+    user: sigpad
