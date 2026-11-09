@@ -1,0 +1,13 @@
+{% for linha in linhas %}
+    <div class="mb-3">
+        <div class="d-flex justify-content-between small mb-1">
+            <span>{{ linha.rotulo }}</span>
+            <span class="text-muted">{{ linha.quantidade }} ({{ linha.percentual }}%)</span>
+        </div>
+        <div class="progress" role="progressbar" aria-label="{{ linha.rotulo }}" aria-valuenow="{{ linha.percentual }}" aria-valuemin="0" aria-valuemax="100" style="height: 10px;">
+            <div class="progress-bar {{ linha.classe }}" style="width: {{ linha.percentual }}%"></div>
+        </div>
+    </div>
+{% empty %}
+    <p class="text-muted mb-0">Sem registros.</p>
+{% endfor %}

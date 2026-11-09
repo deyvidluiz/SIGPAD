@@ -1,0 +1,10 @@
+{% with nome=request.resolver_match.url_name %}
+<nav class="nav nav-pills flex-column flex-sm-row gap-2 mt-3" aria-label="Navegacao da administracao">
+    <a class="nav-link {% if nome == 'painel_dashboard' %}active{% endif %}" href="{% url 'painel_dashboard' %}"><i class="bi bi-speedometer2 me-1" aria-hidden="true"></i>Visao geral</a>
+    <a class="nav-link {% if 'usuario' in nome %}active{% endif %}" href="{% url 'painel_usuarios' %}"><i class="bi bi-person-badge me-1" aria-hidden="true"></i>Usuarios</a>
+    <a class="nav-link {% if 'turma' in nome %}active{% endif %}" href="{% url 'painel_turmas' %}"><i class="bi bi-people me-1" aria-hidden="true"></i>Turmas</a>
+    <a class="nav-link {% if 'disciplina' in nome %}active{% endif %}" href="{% url 'painel_disciplinas' %}"><i class="bi bi-journal-bookmark me-1" aria-hidden="true"></i>Disciplinas</a>
+    <a class="nav-link {% if nome == 'painel_planejamento' %}active{% endif %}" href="{% url 'painel_planejamento' %}"><i class="bi bi-calendar-check me-1" aria-hidden="true"></i>Planejamento</a>
+    <a class="nav-link {% if nome == 'painel_relatorios' %}active{% endif %}" href="{% url 'painel_relatorios' %}"><i class="bi bi-file-earmark-bar-graph me-1" aria-hidden="true"></i>Relatorios</a>
+</nav>
+{% endwith %}

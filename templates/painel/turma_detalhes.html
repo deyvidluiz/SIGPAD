@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ turma.nome }} | Administracao SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-people" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao &middot; Turmas{% endblock %}
+{% block page_title %}{{ turma.nome }} - {{ turma.ano_letivo }}{% endblock %}
+{% block page_subtitle %}{{ turma.get_turno_display }} &middot; Professor responsavel: {{ turma.professor.get_full_name|default:turma.professor.username }}{% endblock %}
+{% block heading_actions %}
+<a class="btn btn-primary btn-sm" href="{% url 'painel_turma_editar' turma.id %}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar turma</a>
+<a class="btn btn-outline-primary btn-sm" href="{% url 'painel_disciplina_criar' %}?turma={{ turma.id }}"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Nova disciplina</a>
+{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<section class="row g-3 mt-1">
+    <div class="col-6 col-xl-3"><article class="metric-card metric-primary h-100"><div class="metric-top"><span class="metric-label">Alunos ativos</span><span class="metric-icon"><i class="bi bi-mortarboard" aria-hidden="true"></i></span></div><div class="metric-value">{{ indicadores.alunos }}</div>{% if alunos_inativos %}<div class="metric-meta">{{ alunos_inativos }} inativo{{ alunos_inativos|pluralize }}</div>{% endif %}</article></div>
+    <div class="col-6 col-xl-3"><article class="metric-card metric-success h-100"><div class="metric-top"><span class="metric-label">Frequencia media</span><span class="metric-icon"><i class="bi bi-calendar2-check" aria-hidden="true"></i></span></div><div class="metric-value">{% if indicadores.frequencia_media is not None %}{{ indicadores.frequencia_media }}%{% else %}-{% endif %}</div><div class="metric-meta">{{ indicadores.alunos_baixa_frequencia }} aluno{{ indicadores.alunos_baixa_frequencia|pluralize }} abaixo de 75%</div></article></div>
+    <div class="col-6 col-xl-3"><article class="metric-card metric-warning h-100"><div class="metric-top"><span class="metric-label">Media geral</span><span class="metric-icon"><i class="bi bi-graph-up" aria-hidden="true"></i></span></div><div class="metric-value">{% if indicadores.media_geral is not None %}{{ indicadores.media_geral }}{% else %}-{% endif %}</div><div class="metric-meta">{{ indicadores.alunos_abaixo_media }} aluno{{ indicadores.alunos_abaixo_media|pluralize }} abaixo da media</div></article></div>
+    <div class="col-6 col-xl-3"><article class="metric-card metric-danger h-100"><div class="metric-top"><span class="metric-label">Pendencias</span><span class="metric-icon"><i class="bi bi-hourglass-split" aria-hidden="true"></i></span></div><div class="metric-value">{{ atividades_pendentes }}</div><div class="metric-meta">{{ alertas_nao_lidos }} alerta{{ alertas_nao_lidos|pluralize }} nao lido{{ alertas_nao_lidos|pluralize }}</div></article></div>
+</section>
+
+{% if turma.descricao %}<p class="text-muted mt-3 mb-0">{{ turma.descricao }}</p>{% endif %}
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title"><i class="bi bi-journal-bookmark" aria-hidden="true"></i><span>Andamento das disciplinas</span></h2>
+            <p class="text-muted mb-0">Aulas registradas frente as previstas e conteudos concluidos.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'painel_planejamento' %}?turma={{ turma.id }}">Ver atividades</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Disciplina</th><th>Professor</th><th style="min-width: 170px;">Aulas</th><th style="min-width: 170px;">Conteudos</th><th class="text-end">Atividades</th><th class="text-end">Relatorios</th><th class="text-end">Acoes</th></tr></thead>
+            <tbody>
+                {% for disciplina in disciplinas %}
+                    <tr>
+                        <td>{{ disciplina.nome }}<span class="d-block small text-muted">{{ disciplina.ano_escolar }}</span></td>
+                        <td>{{ disciplina.professor.get_full_name|default:disciplina.professor.username|default:'-' }}</td>
+                        <td>
+                            <div class="progress" style="height: 8px;" role="progressbar" aria-label="Aulas registradas" aria-valuenow="{{ disciplina.progresso_aulas }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar bg-primary" style="width: {{ disciplina.progresso_aulas }}%"></div></div>
+                            <span class="small text-muted">{{ disciplina.aulas_registradas }} de {{ disciplina.quantidade_aulas }}</span>
+                        </td>
+                        <td>
+                            <div class="progress" style="height: 8px;" role="progressbar" aria-label="Conteudos concluidos" aria-valuenow="{{ disciplina.progresso_conteudos }}" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar bg-success" style="width: {{ disciplina.progresso_conteudos }}%"></div></div>
+                            <span class="small text-muted">{{ disciplina.conteudos_concluidos }} de {{ disciplina.total_conteudos }}</span>
+                        </td>
+                        <td class="text-end"><a href="{% url 'painel_planejamento' %}?turma={{ turma.id }}&disciplina={{ disciplina.id }}">{{ disciplina.total_atividades }}</a></td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'exportar_notas_pdf' turma.id %}?disciplina={{ disciplina.id }}">Notas</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'exportar_frequencia_pdf' turma.id %}?disciplina={{ disciplina.id }}">Frequencia</a>
+                            <a class="btn btn-sm btn-primary" href="{% url 'relatorio_final' turma.id %}?disciplina={{ disciplina.id }}">Final</a>
+                        </td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'painel_disciplina_editar' disciplina.id %}">Editar</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma disciplina cadastrada nesta turma.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Usuarios | Administracao SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-person-badge" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao{% endblock %}
+{% block page_title %}Usuarios{% endblock %}
+{% block page_subtitle %}Professores e administradores cadastrados no SIGPAD.{% endblock %}
+{% block heading_actions %}<a class="btn btn-primary btn-sm" href="{% url 'painel_usuario_criar' %}"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Novo usuario</a>{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mt-3">
+    <div class="card-body border-bottom">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-12 col-md-5">
+                <label for="q" class="form-label small">Buscar</label>
+                <input id="q" type="search" name="q" value="{{ q }}" class="form-control" placeholder="Nome, usuario ou e-mail">
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="papel" class="form-label small">Papel</label>
+                <select id="papel" name="papel" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="professor" {% if papel == 'professor' %}selected{% endif %}>Professor</option>
+                    <option value="admin" {% if papel == 'admin' %}selected{% endif %}>Administrador</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label for="situacao" class="form-label small">Situacao</label>
+                <select id="situacao" name="situacao" class="form-select">
+                    <option value="">Todas</option>
+                    <option value="ativos" {% if situacao == 'ativos' %}selected{% endif %}>Ativos</option>
+                    <option value="inativos" {% if situacao == 'inativos' %}selected{% endif %}>Inativos</option>
+                </select>
+            </div>
+            <div class="col-12 col-md-3 d-flex gap-2">
+                <button class="btn btn-primary flex-grow-1" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filtrar</button>
+                <a class="btn btn-outline-secondary" href="{% url 'painel_usuarios' %}">Limpar</a>
+            </div>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr><th>Usuario</th><th>Papel</th><th class="text-end">Turmas</th><th class="text-end">Disciplinas</th><th>Ultimo acesso</th><th>Situacao</th><th class="text-end">Acoes</th></tr>
+            </thead>
+            <tbody>
+                {% for usuario in pagina %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'painel_usuario_detalhes' usuario.id %}">{{ usuario.get_full_name|default:usuario.username }}</a>
+                            <span class="d-block small text-muted text-break">{{ usuario.username }}{% if usuario.email %} &middot; {{ usuario.email }}{% endif %}</span>
+                        </td>
+                        <td>
+                            {% if usuario.is_superuser %}<span class="badge text-bg-danger">Superusuario</span>
+                            {% elif usuario.is_admin_grupo %}<span class="badge text-bg-warning">Administrador</span>
+                            {% else %}<span class="badge text-bg-primary">Professor</span>{% endif %}
+                        </td>
+                        <td class="text-end">{{ usuario.total_turmas }}</td>
+                        <td class="text-end">{{ usuario.total_disciplinas }}</td>
+                        <td class="small text-muted text-nowrap">{{ usuario.last_login|date:'d/m/Y H:i'|default:'Nunca' }}</td>
+                        <td>{% if usuario.is_active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'painel_usuario_detalhes' usuario.id %}" title="Ver perfil"><i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Ver</span></a>
+                            {% if not usuario.is_superuser or request.user.is_superuser %}
+                                <a class="btn btn-sm btn-outline-primary" href="{% url 'painel_usuario_editar' usuario.id %}" title="Editar"><i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">Editar</span></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhum usuario encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'painel/_paginacao.html' %}
+</div>
+{% endblock %}

@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ usuario.get_full_name|default:usuario.username }} | Administracao SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-person-vcard" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao &middot; Usuarios{% endblock %}
+{% block page_title %}{{ usuario.get_full_name|default:usuario.username }}{% endblock %}
+{% block page_subtitle %}Perfil, permissoes e vinculos academicos.{% endblock %}
+{% block heading_actions %}
+{% if pode_editar %}
+    <a class="btn btn-primary btn-sm" href="{% url 'painel_usuario_editar' usuario.id %}"><i class="bi bi-pencil me-1" aria-hidden="true"></i>Editar</a>
+    <a class="btn btn-outline-secondary btn-sm" href="{% url 'painel_usuario_senha' usuario.id %}"><i class="bi bi-key me-1" aria-hidden="true"></i>Redefinir senha</a>
+    {% if usuario.pk != request.user.pk %}
+        <form method="post" action="{% url 'painel_usuario_alternar_ativo' usuario.id %}" class="d-inline" onsubmit="return confirm('{% if usuario.is_active %}Desativar{% else %}Reativar{% endif %} a conta de {{ usuario.username|escapejs }}?');">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{% url 'painel_usuario_detalhes' usuario.id %}">
+            {% if usuario.is_active %}
+                <button class="btn btn-outline-danger btn-sm" type="submit"><i class="bi bi-person-x me-1" aria-hidden="true"></i>Desativar</button>
+            {% else %}
+                <button class="btn btn-outline-success btn-sm" type="submit"><i class="bi bi-person-check me-1" aria-hidden="true"></i>Reativar</button>
+            {% endif %}
+        </form>
+    {% endif %}
+{% endif %}
+{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<section class="row g-3 mt-1">
+    <div class="col-12 col-lg-4">
+        <div class="panel h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                {% if perfil and perfil.foto %}
+                    <img class="avatar-img rounded-circle" style="width: 72px; height: 72px; object-fit: cover;" src="{{ perfil.foto.url }}" alt="Foto de {{ usuario.username }}">
+                {% else %}
+                    <img class="avatar-img rounded-circle" style="width: 72px; height: 72px;" src="{% static 'assets/images/avatar/avatar.jpg' %}" alt="Foto padrao">
+                {% endif %}
+                <div>
+                    <h2 class="h5 mb-1">{{ usuario.get_full_name|default:usuario.username }}</h2>
+                    {% if usuario.is_superuser %}<span class="badge text-bg-danger">Superusuario</span>
+                    {% elif is_admin %}<span class="badge text-bg-warning">Administrador</span>
+                    {% else %}<span class="badge text-bg-primary">Professor</span>{% endif %}
+                    {% if usuario.is_active %}<span class="badge text-bg-success">Ativo</span>{% else %}<span class="badge text-bg-secondary">Inativo</span>{% endif %}
+                </div>
+            </div>
+            <dl class="row small mb-0">
+                <dt class="col-5 text-muted fw-normal">Usuario</dt><dd class="col-7">{{ usuario.username }}</dd>
+                <dt class="col-5 text-muted fw-normal">E-mail</dt><dd class="col-7 text-break">{{ usuario.email|default:'-' }}</dd>
+                <dt class="col-5 text-muted fw-normal">Cadastro</dt><dd class="col-7">{{ usuario.date_joined|date:'d/m/Y' }}</dd>
+                <dt class="col-5 text-muted fw-normal">Ultimo acesso</dt><dd class="col-7">{{ usuario.last_login|date:'d/m/Y H:i'|default:'Nunca' }}</dd>
+                <dt class="col-5 text-muted fw-normal">Django Admin</dt><dd class="col-7">{% if usuario.is_staff %}Sim{% else %}Nao{% endif %}</dd>
+            </dl>
+            {% if not pode_editar %}<p class="small text-muted mt-3 mb-0">Somente superusuarios podem alterar esta conta.</p>{% endif %}
+        </div>
+    </div>
+    <div class="col-12 col-lg-8">
+        <div class="row g-3">
+            <div class="col-6 col-md-3"><article class="metric-card metric-primary h-100"><div class="metric-top"><span class="metric-label">Turmas</span></div><div class="metric-value">{{ turmas|length }}</div></article></div>
+            <div class="col-6 col-md-3"><article class="metric-card metric-success h-100"><div class="metric-top"><span class="metric-label">Disciplinas</span></div><div class="metric-value">{{ disciplinas|length }}</div></article></div>
+            <div class="col-6 col-md-3"><article class="metric-card metric-warning h-100"><div class="metric-top"><span class="metric-label">Atividades</span></div><div class="metric-value">{{ total_atividades }}</div></article></div>
+            <div class="col-6 col-md-3"><article class="metric-card metric-danger h-100"><div class="metric-top"><span class="metric-label">Alertas nao lidos</span></div><div class="metric-value">{{ alertas_nao_lidos }}</div></article></div>
+        </div>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <h2 class="h5 mb-0 section-title"><i class="bi bi-people" aria-hidden="true"></i><span>Turmas</span></h2>
+        <a class="btn btn-light btn-sm" href="{% url 'painel_turma_criar' %}">Nova turma</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Turma</th><th>Ano</th><th>Turno</th><th class="text-end">Disciplinas</th><th class="text-end">Alunos</th><th class="text-end">Frequencia</th><th class="text-end">Media</th></tr></thead>
+            <tbody>
+                {% for turma in turmas %}
+                    <tr>
+                        <td><a href="{% url 'painel_turma_detalhes' turma.id %}">{{ turma.nome }}</a></td>
+                        <td>{{ turma.ano_letivo }}</td>
+                        <td>{{ turma.get_turno_display }}</td>
+                        <td class="text-end">{{ turma.total_disciplinas }}</td>
+                        <td class="text-end">{{ turma.total_alunos }}</td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.frequencia_media limite=75 sufixo='%' %}</td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.media_geral limite=6 %}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma turma vinculada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header"><h2 class="h5 mb-0 section-title"><i class="bi bi-journal-bookmark" aria-hidden="true"></i><span>Disciplinas</span></h2></div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Disciplina</th><th>Turma</th><th>Ano escolar</th><th class="text-end">Aulas previstas</th><th class="text-end">Acoes</th></tr></thead>
+            <tbody>
+                {% for disciplina in disciplinas %}
+                    <tr>
+                        <td>{{ disciplina.nome }}</td>
+                        <td>{% if disciplina.turma %}<a href="{% url 'painel_turma_detalhes' disciplina.turma.id %}">{{ disciplina.turma.nome }}</a>{% else %}-{% endif %}</td>
+                        <td>{{ disciplina.ano_escolar }}</td>
+                        <td class="text-end">{{ disciplina.quantidade_aulas }}</td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="{% url 'painel_disciplina_editar' disciplina.id %}">Editar</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">Nenhuma disciplina vinculada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

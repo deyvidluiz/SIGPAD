@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Planejamento | Administracao SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-calendar-check" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao{% endblock %}
+{% block page_title %}Planejamento{% endblock %}
+{% block page_subtitle %}Consulta das atividades avaliativas e dos conteudos programaticos de todas as turmas.{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<ul class="nav nav-tabs mt-3">
+    <li class="nav-item"><a class="nav-link {% if aba == 'atividades' %}active{% endif %}" href="?aba=atividades">Atividades</a></li>
+    <li class="nav-item"><a class="nav-link {% if aba == 'conteudos' %}active{% endif %}" href="?aba=conteudos">Conteudos programaticos</a></li>
+</ul>
+<div class="card border-0 shadow-sm">
+    <div class="card-body border-bottom">{% include 'painel/_filtros.html' with mostrar_turma=True mostrar_disciplina=True mostrar_periodo=True %}</div>
+    <div class="table-responsive">
+        {% if aba == 'atividades' %}
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Atividade</th><th>Turma / disciplina</th><th>Professor</th><th>Periodo</th><th>Prazo</th><th class="text-end">Valor</th><th>Situacao</th></tr></thead>
+            <tbody>
+                {% for atividade in pagina %}
+                    <tr>
+                        <td>{{ atividade.titulo }}<span class="d-block small text-muted">{{ atividade.tipo }}</span></td>
+                        <td><a href="{% url 'painel_turma_detalhes' atividade.turma.id %}">{{ atividade.turma.nome }}</a><span class="d-block small text-muted">{{ atividade.disciplina.nome }}</span></td>
+                        <td>{{ atividade.turma.professor.get_full_name|default:atividade.turma.professor.username }}</td>
+                        <td>{{ atividade.get_periodo_planejamento_display }}</td>
+                        <td class="small">{% if atividade.data_abertura and atividade.data_abertura != atividade.data_fechamento %}{{ atividade.data_abertura|date:'d/m/Y' }} a {% endif %}{{ atividade.data_fechamento|date:'d/m/Y'|default:'-' }}</td>
+                        <td class="text-end">{{ atividade.valor_maximo }}</td>
+                        <td>
+                            <span class="badge {% if atividade.status == 'CORRIGIDA' %}text-bg-success{% elif atividade.status == 'FINALIZADA' %}text-bg-info{% elif atividade.status == 'EM_ANDAMENTO' %}text-bg-primary{% else %}text-bg-secondary{% endif %}">{{ atividade.get_status_display }}</span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma atividade encontrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Conteudo</th><th>Turma / disciplina</th><th>Professor</th><th>Periodo</th><th>Previsto</th><th>Situacao</th></tr></thead>
+            <tbody>
+                {% for conteudo in pagina %}
+                    <tr>
+                        <td>{{ conteudo.titulo }}<span class="d-block small text-muted">{{ conteudo.unidade }}</span></td>
+                        <td>{% if conteudo.disciplina.turma %}<a href="{% url 'painel_turma_detalhes' conteudo.disciplina.turma.id %}">{{ conteudo.disciplina.turma.nome }}</a>{% endif %}<span class="d-block small text-muted">{{ conteudo.disciplina.nome }}</span></td>
+                        <td>{{ conteudo.disciplina.professor.get_full_name|default:conteudo.disciplina.professor.username|default:'-' }}</td>
+                        <td>{{ conteudo.get_periodo_planejamento_display }}</td>
+                        <td class="small">{{ conteudo.data_inicio|date:'d/m/Y'|default:'-' }} a {{ conteudo.data_fim|date:'d/m/Y'|default:'-' }}</td>
+                        <td><span class="badge {{ conteudo.get_status_badge_class }}">{{ conteudo.get_status_display }}</span></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="text-center text-muted py-4">Nenhum conteudo encontrado.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+    {% include 'painel/_paginacao.html' %}
+</div>
+{% endblock %}

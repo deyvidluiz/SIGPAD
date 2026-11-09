@@ -32,19 +32,19 @@
                     <span class="nav-icon"><i class="bi bi-speedometer2" aria-hidden="true"></i></span>
                     <span class="nav-text">Dashboard</span>
                 </a>
-                <a class="nav-link {% if 'turma' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_lista' %}">
+                <a class="nav-link {% if 'turma' in request.resolver_match.url_name  and 'painel' not in request.resolver_match.url_name %}active{% endif %}" href="{% url 'turma_lista' %}">
                     <span class="nav-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
                     <span class="nav-text">Turmas</span>
                 </a>
-                <a class="nav-link {% if 'disciplina' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'disciplina_lista' %}">
+                <a class="nav-link {% if 'disciplina' in request.resolver_match.url_name  and 'painel' not in request.resolver_match.url_name %}active{% endif %}" href="{% url 'disciplina_lista' %}">
                     <span class="nav-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span>
                     <span class="nav-text">Disciplinas</span>
                 </a>
-                <a class="nav-link {% if 'relatorio' in request.resolver_match.url_name or 'exportar' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'relatorio_lista' %}">
+                <a class="nav-link {% if 'painel' not in request.resolver_match.url_name and 'relatorio' in request.resolver_match.url_name or 'exportar' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'relatorio_lista' %}">
                     <span class="nav-icon"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i></span>
                     <span class="nav-text">Relatorios</span>
                 </a>
-                <a class="nav-link {% if 'alerta' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'alerta_lista' %}">
+                <a class="nav-link {% if 'alerta' in request.resolver_match.url_name  and 'painel' not in request.resolver_match.url_name %}active{% endif %}" href="{% url 'alerta_lista' %}">
                     <span class="nav-icon"><i class="bi bi-bell" aria-hidden="true"></i></span>
                     <span class="nav-text">Alertas</span>
                 </a>
@@ -52,6 +52,12 @@
                     <span class="nav-icon"><i class="bi bi-person-circle" aria-hidden="true"></i></span>
                     <span class="nav-text">Meu Perfil</span>
                 </a>
+                {% if is_admin_sigpad %}
+                    <a class="nav-link {% if 'painel' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'painel_dashboard' %}" {% if 'painel' in request.resolver_match.url_name %}aria-current="page"{% endif %}>
+                        <span class="nav-icon"><i class="bi bi-shield-lock" aria-hidden="true"></i></span>
+                        <span class="nav-text">Administracao</span>
+                    </a>
+                {% endif %}
             </nav>
 
             <div class="sidebar-footer">
@@ -118,6 +124,7 @@
                             <ul class="dropdown-menu dropdown-menu-end">
                                 {% if request.user.is_authenticated %}
                                     <li><a class="dropdown-item" href="{% url 'perfil_usuario' %}">Meu Perfil</a></li>
+                                    {% if is_admin_sigpad %}<li><a class="dropdown-item" href="{% url 'painel_dashboard' %}">Administracao</a></li>{% endif %}
                                     <li><hr class="dropdown-divider"></li>
                                     <li>
                                         <form method="post" action="{% url 'logout' %}">

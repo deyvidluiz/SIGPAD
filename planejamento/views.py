@@ -42,6 +42,7 @@ from .models import (
     RegistroAlunoTurma,
     Turma,
 )
+from .permissoes import is_admin_sigpad
 from .utils import alertas_gerais_usuario, verificar_alertas_conteudos
 
 
@@ -709,10 +710,20 @@ def _pdf_simples(titulo, cabecalhos, linhas):
     return bytes(pdf)
 
 
+def _turma_e_disciplina_relatorio(request, turma_id):
+    """Professor acessa apenas as proprias turmas; administradores do SIGPAD acessam todas."""
+    if is_admin_sigpad(request.user):
+        turma = get_object_or_404(Turma, id=turma_id)
+        disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma)
+    else:
+        turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
+        disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    return turma, disciplina
+
+
 @login_required
 def exportar_notas_pdf(request, turma_id):
-    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
-    disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    turma, disciplina = _turma_e_disciplina_relatorio(request, turma_id)
     alunos = list(turma.alunos.filter(ativo=True))
     avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina).select_related('disciplina'))
     notas = {
@@ -730,8 +741,7 @@ def exportar_notas_pdf(request, turma_id):
 
 @login_required
 def exportar_frequencia_pdf(request, turma_id):
-    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
-    disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    turma, disciplina = _turma_e_disciplina_relatorio(request, turma_id)
     alunos = list(turma.alunos.filter(ativo=True))
     _, resumo = _resumo_presencas_aulas(turma, disciplina, alunos)
     cabecalhos = ['Aluno', 'Aulas', 'Faltas', 'Presencas', 'Frequencia', 'Situacao']
@@ -753,8 +763,7 @@ def exportar_frequencia_pdf(request, turma_id):
 
 @login_required
 def relatorio_final(request, turma_id):
-    turma = get_object_or_404(Turma, id=turma_id, professor=request.user)
-    disciplina = get_object_or_404(Disciplina, id=request.GET.get('disciplina'), turma=turma, professor=request.user)
+    turma, disciplina = _turma_e_disciplina_relatorio(request, turma_id)
     alunos = list(turma.alunos.filter(ativo=True))
     avaliacoes = list(turma.processos_avaliativos.filter(disciplina=disciplina))
     notas = list(NotaAluno.objects.filter(aluno__in=alunos, processo__in=avaliacoes))

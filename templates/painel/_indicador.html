@@ -1,0 +1,1 @@
+{% load l10n %}{% if valor is None %}<span class="text-muted">-</span>{% else %}<span class="{% if valor < limite %}text-danger fw-semibold{% endif %}">{{ valor }}{{ sufixo }}</span>{% endif %}

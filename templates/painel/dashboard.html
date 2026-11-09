@@ -1,0 +1,191 @@
+{% extends 'base.html' %}
+
+{% block title %}Administracao | SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-shield-lock" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao{% endblock %}
+{% block page_title %}Painel administrativo{% endblock %}
+{% block page_subtitle %}Indicadores de todas as turmas, professores e registros academicos do SIGPAD.{% endblock %}
+{% block heading_actions %}
+<form method="get" class="d-flex gap-2 align-items-center">
+    <label for="filtro-ano" class="visually-hidden">Ano letivo</label>
+    <select id="filtro-ano" name="ano" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">Todos os anos</option>
+        {% for item in anos %}<option value="{{ item }}" {% if item == ano %}selected{% endif %}>{{ item }}</option>{% endfor %}
+    </select>
+    <noscript><button class="btn btn-sm btn-primary">Filtrar</button></noscript>
+</form>
+{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<section class="row g-3 mt-1" aria-label="Indicadores gerais">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <a class="text-decoration-none d-block h-100" href="{% url 'painel_usuarios' %}?papel=professor&situacao=ativos">
+        <article class="metric-card metric-primary h-100">
+            <div class="metric-top"><span class="metric-label">Professores ativos</span><span class="metric-icon"><i class="bi bi-person-badge" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{{ total_professores }}</div>
+            <div class="metric-meta">{{ total_admins }} administrador{{ total_admins|pluralize:"es" }} &middot; {{ professores_inativos }} conta{{ professores_inativos|pluralize }} inativa{{ professores_inativos|pluralize }}</div>
+        </article>
+        </a>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <a class="text-decoration-none d-block h-100" href="{% url 'painel_turmas' %}{% if ano %}?ano={{ ano }}{% endif %}">
+        <article class="metric-card metric-success h-100">
+            <div class="metric-top"><span class="metric-label">Turmas</span><span class="metric-icon"><i class="bi bi-people" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{{ total_turmas }}</div>
+            <div class="metric-meta">{{ resumo.alunos }} aluno{{ resumo.alunos|pluralize }} ativo{{ resumo.alunos|pluralize }}</div>
+        </article>
+        </a>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <a class="text-decoration-none d-block h-100" href="{% url 'painel_disciplinas' %}{% if ano %}?ano={{ ano }}{% endif %}">
+        <article class="metric-card metric-warning h-100">
+            <div class="metric-top"><span class="metric-label">Disciplinas</span><span class="metric-icon"><i class="bi bi-journal-bookmark" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{{ total_disciplinas }}</div>
+            <div class="metric-meta">{{ total_aulas }} aula{{ total_aulas|pluralize }} registrada{{ total_aulas|pluralize }}</div>
+        </article>
+        </a>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <a class="text-decoration-none d-block h-100" href="{% url 'painel_planejamento' %}{% if ano %}?ano={{ ano }}{% endif %}">
+        <article class="metric-card metric-danger h-100">
+            <div class="metric-top"><span class="metric-label">Atividades</span><span class="metric-icon"><i class="bi bi-clipboard-check" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{{ total_atividades }}</div>
+            <div class="metric-meta">{{ atividades_pendentes }} pendente{{ atividades_pendentes|pluralize }}</div>
+        </article>
+        </a>
+    </div>
+</section>
+
+<section class="row g-3 mt-1" aria-label="Indicadores academicos">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-primary h-100">
+            <div class="metric-top"><span class="metric-label">Frequencia media</span><span class="metric-icon"><i class="bi bi-calendar2-check" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{% if resumo.frequencia_media is not None %}{{ resumo.frequencia_media }}%{% else %}-{% endif %}</div>
+            <div class="metric-meta">Media das turmas com aulas registradas</div>
+        </article>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-danger h-100">
+            <div class="metric-top"><span class="metric-label">Baixa frequencia</span><span class="metric-icon"><i class="bi bi-person-dash" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{{ resumo.alunos_baixa_frequencia }}</div>
+            <div class="metric-meta">Alunos abaixo de 75% em ao menos uma disciplina</div>
+        </article>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-success h-100">
+            <div class="metric-top"><span class="metric-label">Media geral</span><span class="metric-icon"><i class="bi bi-graph-up" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{% if resumo.media_geral is not None %}{{ resumo.media_geral }}{% else %}-{% endif %}</div>
+            <div class="metric-meta">Considera apenas avaliacoes com notas lancadas</div>
+        </article>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+        <article class="metric-card metric-warning h-100">
+            <div class="metric-top"><span class="metric-label">Abaixo da media</span><span class="metric-icon"><i class="bi bi-graph-down" aria-hidden="true"></i></span></div>
+            <div class="metric-value">{{ resumo.alunos_abaixo_media }}</div>
+            <div class="metric-meta">Alunos abaixo da media em ao menos uma disciplina</div>
+        </article>
+    </div>
+</section>
+
+<section class="row g-3 mt-1">
+    <div class="col-12 col-lg-4">
+        <div class="panel h-100">
+            <div class="panel-header"><h2 class="h6 mb-0 section-title"><i class="bi bi-clipboard-check" aria-hidden="true"></i><span>Atividades por situacao</span></h2></div>
+            {% include 'painel/_barras.html' with linhas=status_atividades %}
+        </div>
+    </div>
+    <div class="col-12 col-lg-4">
+        <div class="panel h-100">
+            <div class="panel-header"><h2 class="h6 mb-0 section-title"><i class="bi bi-list-check" aria-hidden="true"></i><span>Conteudos programaticos</span></h2></div>
+            {% include 'painel/_barras.html' with linhas=status_conteudos %}
+        </div>
+    </div>
+    <div class="col-12 col-lg-4">
+        <div class="panel h-100">
+            <div class="panel-header"><h2 class="h6 mb-0 section-title"><i class="bi bi-bell" aria-hidden="true"></i><span>Alertas nao lidos ({{ total_alertas }})</span></h2></div>
+            {% include 'painel/_barras.html' with linhas=alertas_por_tipo %}
+            {% if alertas_por_professor %}
+                <h3 class="h6 mt-3 mb-2 text-muted">Por professor</h3>
+                <ul class="list-unstyled small mb-0">
+                    {% for item in alertas_por_professor %}
+                        <li class="d-flex justify-content-between py-1">
+                            <a href="{% url 'painel_usuario_detalhes' item.usuario__id %}">{% if item.usuario__first_name %}{{ item.usuario__first_name }} {{ item.usuario__last_name }}{% else %}{{ item.usuario__username }}{% endif %}</a>
+                            <span class="badge text-bg-secondary">{{ item.total }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title"><i class="bi bi-people" aria-hidden="true"></i><span>Frequencia e desempenho por turma</span></h2>
+            <p class="text-muted mb-0">Valores calculados a partir das aulas, presencas e notas registradas pelos professores.</p>
+        </div>
+        <a class="btn btn-light btn-sm" href="{% url 'painel_relatorios' %}{% if ano %}?ano={{ ano }}{% endif %}">Relatorios</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr><th>Turma</th><th>Professor</th><th class="text-end">Alunos</th><th style="min-width: 180px;">Frequencia media</th><th class="text-end">Media geral</th><th class="text-end">Baixa freq.</th><th class="text-end">Abaixo da media</th></tr>
+            </thead>
+            <tbody>
+                {% for turma in turmas %}
+                    <tr>
+                        <td><a href="{% url 'painel_turma_detalhes' turma.id %}">{{ turma.nome }}</a><span class="d-block small text-muted">{{ turma.get_turno_display }} - {{ turma.ano_letivo }}</span></td>
+                        <td>{{ turma.professor.get_full_name|default:turma.professor.username }}</td>
+                        <td class="text-end">{{ turma.indicadores.alunos }}</td>
+                        <td>
+                            {% if turma.indicadores.frequencia_media is not None %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 8px;" role="progressbar" aria-label="Frequencia" aria-valuenow="{{ turma.indicadores.frequencia_media|stringformat:'d' }}" aria-valuemin="0" aria-valuemax="100">
+                                        <div class="progress-bar {% if turma.indicadores.frequencia_media < 75 %}bg-danger{% elif turma.indicadores.frequencia_media < 85 %}bg-warning{% else %}bg-success{% endif %}" style="width: {{ turma.indicadores.frequencia_media|stringformat:'d' }}%"></div>
+                                    </div>
+                                    <span class="small">{{ turma.indicadores.frequencia_media }}%</span>
+                                </div>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.media_geral limite=6 %}</td>
+                        <td class="text-end">{{ turma.indicadores.alunos_baixa_frequencia }}</td>
+                        <td class="text-end">{{ turma.indicadores.alunos_abaixo_media }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma turma cadastrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="row g-3 mt-1">
+    <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+            <div class="panel-header"><h2 class="h6 mb-0 section-title"><i class="bi bi-lightning" aria-hidden="true"></i><span>Atalhos</span></h2></div>
+            <div class="d-flex flex-wrap gap-2">
+                <a class="btn btn-primary btn-sm" href="{% url 'painel_usuario_criar' %}"><i class="bi bi-person-plus me-1" aria-hidden="true"></i>Novo professor</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'painel_turma_criar' %}"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Nova turma</a>
+                <a class="btn btn-outline-primary btn-sm" href="{% url 'painel_disciplina_criar' %}"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Nova disciplina</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{% url 'painel_planejamento' %}?status=EM_ANDAMENTO"><i class="bi bi-hourglass-split me-1" aria-hidden="true"></i>Atividades em andamento</a>
+                <a class="btn btn-outline-secondary btn-sm" href="{% url 'painel_planejamento' %}?aba=conteudos&status=ATRASADO"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Conteudos atrasados</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-lg-6">
+        <div class="panel h-100">
+            <div class="panel-header"><h2 class="h6 mb-0 section-title"><i class="bi bi-person-plus" aria-hidden="true"></i><span>Ultimos cadastros</span></h2><a class="btn btn-light btn-sm" href="{% url 'painel_usuarios' %}">Ver usuarios</a></div>
+            <ul class="list-group list-group-flush">
+                {% for usuario in ultimos_usuarios %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <a href="{% url 'painel_usuario_detalhes' usuario.id %}">{{ usuario.get_full_name|default:usuario.username }}</a>
+                        <span class="small text-muted">{{ usuario.date_joined|date:'d/m/Y' }}{% if not usuario.is_active %} &middot; <span class="badge text-bg-secondary">inativo</span>{% endif %}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</section>
+{% endblock %}

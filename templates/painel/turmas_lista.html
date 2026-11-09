@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Turmas | Administracao SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-people" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao{% endblock %}
+{% block page_title %}Turmas{% endblock %}
+{% block page_subtitle %}Todas as turmas cadastradas, com professor responsavel e indicadores.{% endblock %}
+{% block heading_actions %}<a class="btn btn-primary btn-sm" href="{% url 'painel_turma_criar' %}"><i class="bi bi-plus-lg me-1" aria-hidden="true"></i>Nova turma</a>{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mt-3">
+    <div class="card-body border-bottom">{% include 'painel/_filtros.html' with status_choices=turnos rotulo_status='Turno' %}</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Turma</th><th>Professor</th><th class="text-end">Disciplinas</th><th class="text-end">Alunos</th><th class="text-end">Atividades</th><th class="text-end">Frequencia</th><th class="text-end">Media</th><th class="text-end">Acoes</th></tr></thead>
+            <tbody>
+                {% for turma in pagina %}
+                    <tr>
+                        <td><a href="{% url 'painel_turma_detalhes' turma.id %}">{{ turma.nome }}</a><span class="d-block small text-muted">{{ turma.get_turno_display }} - {{ turma.ano_letivo }}</span></td>
+                        <td><a href="{% url 'painel_usuario_detalhes' turma.professor.id %}">{{ turma.professor.get_full_name|default:turma.professor.username }}</a>{% if not turma.professor.is_active %} <span class="badge text-bg-secondary">inativo</span>{% endif %}</td>
+                        <td class="text-end">{{ turma.total_disciplinas }}</td>
+                        <td class="text-end">{{ turma.total_alunos }}</td>
+                        <td class="text-end">{{ turma.total_atividades }}</td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.frequencia_media limite=75 sufixo='%' %}</td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.media_geral limite=6 %}</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'painel_turma_detalhes' turma.id %}" title="Detalhes"><i class="bi bi-eye" aria-hidden="true"></i><span class="visually-hidden">Detalhes</span></a>
+                            <a class="btn btn-sm btn-outline-primary" href="{% url 'painel_turma_editar' turma.id %}" title="Editar"><i class="bi bi-pencil" aria-hidden="true"></i><span class="visually-hidden">Editar</span></a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="text-center text-muted py-4">Nenhuma turma encontrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'painel/_paginacao.html' %}
+</div>
+{% endblock %}

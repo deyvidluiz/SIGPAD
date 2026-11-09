@@ -1,0 +1,62 @@
+{# Formulario de filtros reutilizado. Parametros: mostrar_turma, mostrar_disciplina, mostrar_periodo, status_choices, rotulo_status, aba #}
+<form method="get" class="row g-2 align-items-end">
+    {% if aba %}<input type="hidden" name="aba" value="{{ aba }}">{% endif %}
+    <div class="col-12 col-md-3">
+        <label for="f-q" class="form-label small">Buscar</label>
+        <input id="f-q" type="search" name="q" value="{{ filtros.q }}" class="form-control" placeholder="Digite um termo">
+    </div>
+    <div class="col-6 col-md-2">
+        <label for="f-ano" class="form-label small">Ano letivo</label>
+        <select id="f-ano" name="ano" class="form-select">
+            <option value="">Todos</option>
+            {% for item in anos %}<option value="{{ item }}" {% if item == filtros.ano %}selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select>
+    </div>
+    <div class="col-6 col-md-2">
+        <label for="f-professor" class="form-label small">Professor</label>
+        <select id="f-professor" name="professor" class="form-select">
+            <option value="">Todos</option>
+            {% for item in professores %}<option value="{{ item.id }}" {% if item.id == filtros.professor %}selected{% endif %}>{{ item.get_full_name|default:item.username }}</option>{% endfor %}
+        </select>
+    </div>
+    {% if mostrar_turma %}
+    <div class="col-6 col-md-2">
+        <label for="f-turma" class="form-label small">Turma</label>
+        <select id="f-turma" name="turma" class="form-select">
+            <option value="">Todas</option>
+            {% for item in turmas_filtro %}<option value="{{ item.id }}" {% if item.id == filtros.turma %}selected{% endif %}>{{ item.nome }} ({{ item.ano_letivo }})</option>{% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    {% if mostrar_disciplina %}
+    <div class="col-6 col-md-2">
+        <label for="f-disciplina" class="form-label small">Disciplina</label>
+        <select id="f-disciplina" name="disciplina" class="form-select">
+            <option value="">Todas</option>
+            {% for item in disciplinas_filtro %}<option value="{{ item.id }}" {% if item.id == filtros.disciplina %}selected{% endif %}>{{ item.nome }} - {{ item.turma.nome }}</option>{% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    {% if mostrar_periodo %}
+    <div class="col-6 col-md-2">
+        <label for="f-periodo" class="form-label small">Periodo</label>
+        <select id="f-periodo" name="periodo" class="form-select">
+            <option value="">Todos</option>
+            {% for codigo, nome in periodos %}<option value="{{ codigo }}" {% if codigo == filtros.periodo %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    {% if status_choices %}
+    <div class="col-6 col-md-2">
+        <label for="f-status" class="form-label small">{{ rotulo_status|default:'Situacao' }}</label>
+        <select id="f-status" name="status" class="form-select">
+            <option value="">Todos</option>
+            {% for codigo, nome in status_choices %}<option value="{{ codigo }}" {% if codigo == filtros.status %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select>
+    </div>
+    {% endif %}
+    <div class="col-12 col-md-auto d-flex gap-2">
+        <button class="btn btn-primary" type="submit"><i class="bi bi-funnel me-1" aria-hidden="true"></i>Filtrar</button>
+        <a class="btn btn-outline-secondary" href="?{% if aba %}aba={{ aba }}{% endif %}">Limpar</a>
+    </div>
+</form>

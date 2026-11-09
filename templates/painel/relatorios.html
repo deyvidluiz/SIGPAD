@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatorios | Administracao SIGPAD{% endblock %}
+{% block page_icon %}<i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>{% endblock %}
+{% block page_eyebrow %}Administracao{% endblock %}
+{% block page_title %}Relatorios e acompanhamento{% endblock %}
+{% block page_subtitle %}Indicadores por turma e exportacao dos relatorios em PDF de qualquer disciplina.{% endblock %}
+{% block turma_subnav %}{% include 'painel/_subnav.html' %}{% endblock %}
+
+{% block content %}
+<div class="card border-0 shadow-sm mt-3">
+    <div class="card-body">{% include 'painel/_filtros.html' with mostrar_turma=True %}</div>
+</div>
+
+<section class="panel mt-3">
+    <div class="panel-header">
+        <div>
+            <h2 class="h5 mb-1 section-title"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Indicadores por turma</span></h2>
+            <p class="text-muted mb-0">
+                Frequencia media: {% if resumo.frequencia_media is not None %}{{ resumo.frequencia_media }}%{% else %}-{% endif %}
+                &middot; Media geral: {{ resumo.media_geral|default:'-' }}
+                &middot; {{ resumo.alunos_baixa_frequencia }} com baixa frequencia
+                &middot; {{ resumo.alunos_abaixo_media }} abaixo da media
+            </p>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Turma</th><th>Professor</th><th class="text-end">Alunos</th><th class="text-end">Frequencia media</th><th class="text-end">Media geral</th><th class="text-end">Baixa frequencia</th><th class="text-end">Abaixo da media</th></tr></thead>
+            <tbody>
+                {% for turma in turmas %}
+                    <tr>
+                        <td><a href="{% url 'painel_turma_detalhes' turma.id %}">{{ turma.nome }}</a> <span class="small text-muted">{{ turma.ano_letivo }}</span></td>
+                        <td>{{ turma.professor.get_full_name|default:turma.professor.username }}</td>
+                        <td class="text-end">{{ turma.indicadores.alunos }}</td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.frequencia_media limite=75 sufixo='%' %}</td>
+                        <td class="text-end">{% include 'painel/_indicador.html' with valor=turma.indicadores.media_geral limite=6 %}</td>
+                        <td class="text-end">{{ turma.indicadores.alunos_baixa_frequencia }}</td>
+                        <td class="text-end">{{ turma.indicadores.alunos_abaixo_media }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma turma encontrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="panel mt-3">
+    <div class="panel-header"><h2 class="h5 mb-0 section-title"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i><span>Exportar relatorios (PDF)</span></h2></div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Turma</th><th>Disciplina</th><th>Professor</th><th>Ano</th><th class="text-end">Exportacoes</th></tr></thead>
+            <tbody>
+                {% for disciplina in pagina %}
+                    <tr>
+                        <td>{{ disciplina.turma.nome }}</td>
+                        <td>{{ disciplina.nome }}</td>
+                        <td>{{ disciplina.professor.get_full_name|default:disciplina.professor.username|default:'-' }}</td>
+                        <td>{{ disciplina.turma.ano_letivo }}</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'exportar_notas_pdf' disciplina.turma.id %}?disciplina={{ disciplina.id }}">Notas</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'exportar_frequencia_pdf' disciplina.turma.id %}?disciplina={{ disciplina.id }}">Frequencia</a>
+                            <a class="btn btn-sm btn-primary" href="{% url 'relatorio_final' disciplina.turma.id %}?disciplina={{ disciplina.id }}">Final</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="5" class="text-center text-muted py-4">Nenhuma disciplina encontrada.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'painel/_paginacao.html' %}
+</section>
+{% endblock %}

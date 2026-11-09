@@ -1,7 +1,7 @@
 from django.contrib.auth.views import LoginView, LogoutView
 from django.urls import path
 
-from . import views
+from . import views, views_painel
 from .forms import LoginForm
 
 urlpatterns = [
@@ -63,6 +63,23 @@ urlpatterns = [
     path('perfil/', views.perfil_usuario, name='perfil_usuario'),
     path('perfil/editar/', views.editar_perfil, name='editar_perfil'),
     path('perfil/alterar-senha/', views.alterar_senha, name='alterar_senha'),
+    # Area administrativa do SIGPAD (diferente do Django Admin em /admin/)
+    path('painel/', views_painel.painel_dashboard, name='painel_dashboard'),
+    path('painel/usuarios/', views_painel.painel_usuarios, name='painel_usuarios'),
+    path('painel/usuarios/novo/', views_painel.painel_usuario_criar, name='painel_usuario_criar'),
+    path('painel/usuarios/<int:id>/', views_painel.painel_usuario_detalhes, name='painel_usuario_detalhes'),
+    path('painel/usuarios/<int:id>/editar/', views_painel.painel_usuario_editar, name='painel_usuario_editar'),
+    path('painel/usuarios/<int:id>/senha/', views_painel.painel_usuario_senha, name='painel_usuario_senha'),
+    path('painel/usuarios/<int:id>/alternar-ativo/', views_painel.painel_usuario_alternar_ativo, name='painel_usuario_alternar_ativo'),
+    path('painel/turmas/', views_painel.painel_turmas, name='painel_turmas'),
+    path('painel/turmas/nova/', views_painel.painel_turma_criar, name='painel_turma_criar'),
+    path('painel/turmas/<int:id>/', views_painel.painel_turma_detalhes, name='painel_turma_detalhes'),
+    path('painel/turmas/<int:id>/editar/', views_painel.painel_turma_editar, name='painel_turma_editar'),
+    path('painel/disciplinas/', views_painel.painel_disciplinas, name='painel_disciplinas'),
+    path('painel/disciplinas/nova/', views_painel.painel_disciplina_criar, name='painel_disciplina_criar'),
+    path('painel/disciplinas/<int:id>/editar/', views_painel.painel_disciplina_editar, name='painel_disciplina_editar'),
+    path('painel/planejamento/', views_painel.painel_planejamento, name='painel_planejamento'),
+    path('painel/relatorios/', views_painel.painel_relatorios, name='painel_relatorios'),
     path('login/', LoginView.as_view(template_name='registration/login.html', authentication_form=LoginForm), name='login'),
     path('logout/', LogoutView.as_view(), name='logout'),
 ]
