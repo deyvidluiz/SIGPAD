@@ -311,3 +311,79 @@ class TelasExistentesTests(BasePainelTestCase):
     def test_login_existente(self):
         resposta = self.client.post(reverse('login'), {'username': 'prof', 'password': SENHA})
         self.assertRedirects(resposta, reverse('dashboard'))
+
+
+class ConcederAdminComandoTests(BasePainelTestCase):
+    def rodar(self, *args, entrada=None):
+        from io import StringIO
+        from unittest.mock import patch
+
+        from django.core.management import call_command
+
+        saida = StringIO()
+        with patch('builtins.input', return_value=entrada or ''):
+            call_command('conceder_admin', *args, stdout=saida)
+        return saida.getvalue()
+
+    def estado(self, usuario):
+        usuario = User.objects.get(pk=usuario.pk)
+        return (usuario.is_active, usuario.is_staff, usuario.is_superuser, usuario.password,
+                set(usuario.groups.values_list('name', flat=True)))
+
+    def test_concede_com_confirmacao_sem_mexer_em_mais_nada(self):
+        antes_prof, antes_prof2 = self.estado(self.prof), self.estado(self.prof2)
+        self.rodar('prof', entrada='prof')
+        depois = self.estado(self.prof)
+        self.assertEqual(depois[:4], antes_prof[:4])  # ativo, staff, superuser e senha intactos
+        self.assertEqual(depois[4], {GRUPO_ADMIN})
+        self.assertEqual(self.estado(self.prof2), antes_prof2)  # outra conta intocada
+        self.entrar(User.objects.get(pk=self.prof.pk))
+        self.assertEqual(self.client.get(reverse('painel_dashboard')).status_code, 200)
+
+    def test_sem_confirmacao_nada_muda(self):
+        from django.core.management.base import CommandError
+
+        with self.assertRaises(CommandError):
+            self.rodar('prof', entrada='nao')
+        self.assertFalse(is_admin_sigpad(User.objects.get(pk=self.prof.pk)))
+
+    def test_verificar_e_somente_leitura(self):
+        saida = self.rodar('prof', '--verificar')
+        self.assertIn('acesso ao /painel/: NAO', saida)
+        self.assertFalse(is_admin_sigpad(User.objects.get(pk=self.prof.pk)))
+
+    def test_localiza_por_email_e_confirma_com_sim(self):
+        self.rodar('PROF@escola.test', '--email', '--sim')
+        self.assertTrue(is_admin_sigpad(User.objects.get(pk=self.prof.pk)))
+
+    def test_usuario_inexistente_nao_e_criado(self):
+        from django.core.management.base import CommandError
+
+        total = User.objects.count()
+        with self.assertRaises(CommandError):
+            self.rodar('fantasma', '--sim')
+        self.assertEqual(User.objects.count(), total)
+
+    def test_conta_inativa_e_recusada(self):
+        from django.core.management.base import CommandError
+
+        self.prof.is_active = False
+        self.prof.save()
+        with self.assertRaises(CommandError):
+            self.rodar('prof', '--sim')
+        self.assertFalse(User.objects.get(pk=self.prof.pk).groups.exists())
+
+    def test_ja_admin_nao_altera(self):
+        saida = self.rodar('coord', '--sim')
+        self.assertIn('JA tem acesso', saida)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class DjangoAdminProtegidoTests(BasePainelTestCase):
+    def test_admin_do_sigpad_sem_staff_nao_entra_no_django_admin(self):
+        self.entrar(self.admin)  # grupo do SIGPAD, sem is_staff
+        resposta = self.client.get('/admin/')
+        self.assertEqual(resposta.status_code, 302)
+        self.assertIn('/admin/login/', resposta['Location'])
+        self.entrar(self.prof)
+        self.assertEqual(self.client.get('/admin/').status_code, 302)
